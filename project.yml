@@ -36,13 +36,23 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: cz.sejkora.MedProbe
         PRODUCT_NAME: MedProbe
         MARKETING_VERSION: "0.1.0"
+        # Overridden on the xcodebuild command line by the TestFlight workflow, which
+        # passes the GitHub run number so every uploaded build is unique.
         CURRENT_PROJECT_VERSION: "1"
         TARGETED_DEVICE_FAMILY: "1"          # iPhone only
         GENERATE_INFOPLIST_FILE: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     info:
       path: MedProbe/Info.plist
       properties:
         CFBundleDisplayName: MedProbe
+        # Reference the build settings rather than literals, so the version numbers the
+        # TestFlight workflow injects actually reach the bundle.
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        # MedProbe uses no encryption beyond what iOS itself provides. Declaring this
+        # removes the per-build export compliance question in App Store Connect.
+        ITSAppUsesNonExemptEncryption: false
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
