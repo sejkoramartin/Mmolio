@@ -69,6 +69,10 @@ final class MedtrumBluetoothManager: NSObject, ObservableObject {
     @Published private(set) var lastRejectionReason: String?
     @Published private(set) var packetsReceived: Int = 0
 
+    /// TEMPORARY DIAGNOSTIC: every characteristic found on the pump, with per-characteristic
+    /// notification counts. Present to answer why notifications never arrived on 669A9141.
+    @Published private(set) var characteristics: [DiagnosticCharacteristic] = []
+
     /// Event log rendered at the bottom of the diagnostic screen.
     let log = DiagnosticLog(category: "ble")
 
@@ -126,6 +130,19 @@ final class MedtrumBluetoothManager: NSObject, ObservableObject {
         pumpIdentifier = peripheral.identifier
         connectionState = .connecting
 
+        // Discovery starts over for this session.
+        characteristics.removeAll()
+
+        // When EasyPatch already holds the link, iOS hands us a peripheral that is
+        // *already* connected. CoreBluetooth does not reliably deliver another didConnect
+        // in that case, so drive setup directly — this is what the upstream xDrip base
+        // class does in stopScanAndconnect, and it removes one variable from the diagnosis.
+        if peripheral.state == .connected {
+            log.info("Peripheral \(peripheral.name ?? "unnamed") is already connected, going straight to service discovery")
+            centralManager(central, didConnect: peripheral)
+            return
+        }
+
         log.info("Connecting to \(peripheral.name ?? "unnamed") \(peripheral.identifier.uuidString)")
 
         central.connect(peripheral, options: [
@@ -146,12 +163,39 @@ final class MedtrumBluetoothManager: NSObject, ObservableObject {
         }
     }
 
+    // MARK: - characteristic bookkeeping (temporary diagnostic)
+
+    /// Adds a characteristic if we have not seen it, keeping any counts already collected.
+    private func record(_ entry: DiagnosticCharacteristic) {
+        guard !characteristics.contains(where: { $0.id == entry.id }) else { return }
+        characteristics.append(entry)
+        characteristics.sort { $0.id < $1.id }
+    }
+
+    /// Mutates one recorded characteristic in place, matching on service + characteristic UUID.
+    private func update(uuid: String,
+                        service: String,
+                        _ mutate: (inout DiagnosticCharacteristic) -> Void) {
+        // A notification can in principle arrive before discovery bookkeeping, and the
+        // service UUID may be unavailable; match on the characteristic alone in that case
+        // rather than losing the packet from the counts.
+        let index = characteristics.firstIndex { $0.uuid == uuid && $0.serviceUUID == service }
+            ?? characteristics.firstIndex { $0.uuid == uuid }
+
+        if let index {
+            mutate(&characteristics[index])
+        } else {
+            var entry = DiagnosticCharacteristic(serviceUUID: service, uuid: uuid, propertiesRaw: 0)
+            mutate(&entry)
+            characteristics.append(entry)
+            characteristics.sort { $0.id < $1.id }
+        }
+    }
+
     // MARK: - packet handling
 
     private func handleNotification(_ data: Data) {
-        packetsReceived += 1
-        log.info("CGM packet received, \(data.count) bytes: \(MedtrumPacketDecoder.hexString(data))")
-
+        // Counting and hex logging already happened in didUpdateValueFor, before filtering.
         switch MedtrumPacketDecoder.decode(data) {
         case .success(let reading):
             lastReading = reading
@@ -266,62 +310,125 @@ extension MedtrumBluetoothManager: CBPeripheralDelegate {
             return
         }
 
-        guard let service = peripheral.services?.first(where: { $0.uuid == Self.serviceUUID }) else {
-            log.error("Medtrum service \(Self.serviceUUID.uuidString) not present on peripheral")
-            return
+        let services = peripheral.services ?? []
+        log.info("Discovered \(services.count) service(s)")
+
+        if !services.contains(where: { $0.uuid == Self.serviceUUID }) {
+            log.warning("Medtrum service \(Self.serviceUUID.uuidString) not among discovered services")
         }
 
-        log.info("Service discovered \(service.uuid.uuidString), discovering characteristics")
-        peripheral.discoverCharacteristics([Self.cgmNotifyCharacteristicUUID], for: service)
+        for service in services {
+            log.info("Service \(service.uuid.uuidString), discovering all characteristics")
+            // TEMPORARY DIAGNOSTIC: nil, not a filtered list.
+            //
+            // The upstream xDrip base class also discovers with nil, and MedProbe previously
+            // asked for 669A9141 alone. A filtered discovery is the one thing our setup did
+            // differently from the implementation that demonstrably receives glucose, so it
+            // has to be ruled out — and it is the only way to see what else the pump exposes.
+            peripheral.discoverCharacteristics(nil, for: service)
+        }
     }
 
     func peripheral(_ peripheral: CBPeripheral,
                     didDiscoverCharacteristicsFor service: CBService,
                     error: Error?) {
         if let error {
-            log.error("Characteristic discovery failed: \(error.localizedDescription)")
+            log.error("Characteristic discovery failed for \(service.uuid.uuidString): \(error.localizedDescription)")
             return
         }
 
-        guard let characteristic = service.characteristics?
-            .first(where: { $0.uuid == Self.cgmNotifyCharacteristicUUID }) else {
-            log.error("CGM characteristic \(Self.cgmNotifyCharacteristicUUID.uuidString) not found")
-            return
+        let found = service.characteristics ?? []
+        log.info("Service \(service.uuid.uuidString) has \(found.count) characteristic(s)")
+
+        for characteristic in found {
+            let raw = UInt(characteristic.properties.rawValue)
+            let entry = DiagnosticCharacteristic(
+                serviceUUID: service.uuid.uuidString,
+                uuid: characteristic.uuid.uuidString,
+                propertiesRaw: raw
+            )
+            record(entry)
+
+            log.info("Characteristic \(characteristic.uuid.uuidString) properties \(raw) [\(entry.propertiesDescription)] isNotifying=\(characteristic.isNotifying)")
+
+            // TEMPORARY DIAGNOSTIC: subscribe to everything that can push data, not just
+            // the known CGM characteristic. Subscribing is a read-only act — it enables a
+            // notification, it does not send the pump a command.
+            guard entry.supportsNotifications else {
+                log.info("Not subscribing to \(entry.shortUUID): no notify or indicate property")
+                continue
+            }
+
+            update(uuid: entry.uuid, service: entry.serviceUUID) { $0.subscribeAttempted = true }
+            log.info("Subscribing to \(entry.shortUUID)")
+            peripheral.setNotifyValue(true, for: characteristic)
         }
-
-        log.info("Characteristic discovered \(characteristic.uuid.uuidString), properties \(characteristic.properties.rawValue)")
-
-        // The only action MedProbe ever takes on a characteristic: subscribe.
-        peripheral.setNotifyValue(true, for: characteristic)
     }
 
     func peripheral(_ peripheral: CBPeripheral,
                     didUpdateNotificationStateFor characteristic: CBCharacteristic,
                     error: Error?) {
+        let serviceUUID = characteristic.service?.uuid.uuidString ?? "unknown"
+        let shortUUID = String(characteristic.uuid.uuidString.prefix(8))
+
         if let error {
-            log.error("Enabling notifications failed: \(error.localizedDescription)")
+            log.error("Subscribe failed on \(shortUUID): \(error.localizedDescription)")
+            update(uuid: characteristic.uuid.uuidString, service: serviceUUID) {
+                $0.subscribeError = error.localizedDescription
+                $0.isNotifying = false
+            }
             return
+        }
+
+        update(uuid: characteristic.uuid.uuidString, service: serviceUUID) {
+            $0.isNotifying = characteristic.isNotifying
+            $0.subscribeError = nil
         }
 
         if characteristic.isNotifying {
             connectionState = .subscribed
-            log.info("Notifications enabled on \(characteristic.uuid.uuidString)")
+            log.info("Notifications enabled on \(shortUUID)")
         } else {
-            connectionState = .connected
-            log.warning("Notifications disabled on \(characteristic.uuid.uuidString)")
+            log.warning("Notifications disabled on \(shortUUID)")
         }
     }
 
     func peripheral(_ peripheral: CBPeripheral,
                     didUpdateValueFor characteristic: CBCharacteristic,
                     error: Error?) {
+
+        let uuid = characteristic.uuid.uuidString
+        let serviceUUID = characteristic.service?.uuid.uuidString ?? "unknown"
+        let shortUUID = String(uuid.prefix(8))
+
         if let error {
-            log.error("Notification error: \(error.localizedDescription)")
+            log.error("Notification error on \(shortUUID): \(error.localizedDescription)")
             return
         }
 
-        guard characteristic.uuid == Self.cgmNotifyCharacteristicUUID else { return }
-        guard let value = characteristic.value else { return }
+        guard let value = characteristic.value else {
+            log.warning("Notification on \(shortUUID) carried no value")
+            return
+        }
+
+        // TEMPORARY DIAGNOSTIC: log and count every notification BEFORE any UUID filtering,
+        // so a packet arriving on an unexpected characteristic cannot be silently dropped —
+        // which is exactly the failure we are chasing.
+        let hex = MedtrumPacketDecoder.hexString(value)
+        packetsReceived += 1
+        update(uuid: uuid, service: serviceUUID) {
+            $0.packetCount += 1
+            $0.lastPacketHex = hex
+            $0.lastPacketAt = Date()
+        }
+        log.info("NOTIFY \(shortUUID) len=\(value.count) hex=\(hex)")
+
+        // Only the known CGM characteristic is decoded as glucose. Anything else is
+        // recorded and left alone: we will not guess at the meaning of unknown packets.
+        guard characteristic.uuid == Self.cgmNotifyCharacteristicUUID else {
+            log.info("Not decoding \(shortUUID): not the known CGM characteristic")
+            return
+        }
 
         handleNotification(value)
     }

@@ -22,6 +22,7 @@ struct ContentView: View {
         NavigationStack {
             List {
                 statusSection
+                characteristicsSection
                 glucoseSection
                 packetSection
                 logSection
@@ -39,6 +40,61 @@ struct ContentView: View {
             row("Pump", bluetoothManager.pumpName ?? "—")
             row("State", bluetoothManager.connectionState.rawValue)
             row("Packets", "\(bluetoothManager.packetsReceived)")
+        }
+    }
+
+    /// TEMPORARY DIAGNOSTIC: what the pump exposes and what has actually arrived on each
+    /// characteristic. Here to answer why 669A9141 reports isNotifying but delivers nothing.
+    @ViewBuilder
+    private var characteristicsSection: some View {
+        Section("Characteristics") {
+            if bluetoothManager.characteristics.isEmpty {
+                Text("None discovered yet")
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(bluetoothManager.characteristics) { characteristic in
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack {
+                            Text(characteristic.shortUUID)
+                                .font(.system(.subheadline, design: .monospaced))
+                            Spacer()
+                            Text("\(characteristic.packetCount)")
+                                .font(.system(.subheadline, design: .monospaced))
+                                .foregroundStyle(characteristic.packetCount > 0 ? .green : .secondary)
+                        }
+
+                        Text(characteristic.propertiesDescription)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+
+                        HStack(spacing: 6) {
+                            Text(characteristic.isNotifying ? "notifying" : "not notifying")
+                                .font(.caption2)
+                                .foregroundStyle(characteristic.isNotifying ? .green : .secondary)
+
+                            if characteristic.subscribeAttempted && !characteristic.isNotifying {
+                                Text("subscribe attempted")
+                                    .font(.caption2)
+                                    .foregroundStyle(.orange)
+                            }
+                        }
+
+                        if let error = characteristic.subscribeError {
+                            Text(error)
+                                .font(.caption2)
+                                .foregroundStyle(.red)
+                        }
+
+                        if let hex = characteristic.lastPacketHex {
+                            Text(hex)
+                                .font(.system(size: 9, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
         }
     }
 
