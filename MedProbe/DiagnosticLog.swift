@@ -15,11 +15,29 @@ enum DiagnosticLevel: String {
     case error
 }
 
+/// Which part of the system an event came from, so a lifecycle question can be answered
+/// from the log without guessing which line belongs to what.
+enum DiagnosticCategory: String {
+
+    /// CoreBluetooth lifecycle: connect, discovery, subscription, restoration.
+    case ble = "BLE"
+
+    /// Glucose readings and the CGM stream's health.
+    case cgm = "CGM"
+
+    /// The capture file and the Clear button.
+    case recorder = "REC"
+
+    /// Anything else worth recording about the app itself.
+    case diagnostic = "DIAG"
+}
+
 /// One line in the on-screen event log.
 struct DiagnosticEvent: Identifiable {
     let id = UUID()
     let timestamp: Date
     let level: DiagnosticLevel
+    let category: DiagnosticCategory
     let message: String
 }
 
@@ -44,23 +62,26 @@ final class DiagnosticLog: ObservableObject {
         self.logger = Logger(subsystem: MedProbeConstants.logSubsystem, category: category)
     }
 
-    func info(_ message: String) {
-        append(.info, message)
-        logger.info("\(message, privacy: .public)")
+    func info(_ message: String, _ category: DiagnosticCategory = .diagnostic) {
+        append(.info, category, message)
+        logger.info("[\(category.rawValue, privacy: .public)] \(message, privacy: .public)")
     }
 
-    func warning(_ message: String) {
-        append(.warning, message)
-        logger.warning("\(message, privacy: .public)")
+    func warning(_ message: String, _ category: DiagnosticCategory = .diagnostic) {
+        append(.warning, category, message)
+        logger.warning("[\(category.rawValue, privacy: .public)] \(message, privacy: .public)")
     }
 
-    func error(_ message: String) {
-        append(.error, message)
-        logger.error("\(message, privacy: .public)")
+    func error(_ message: String, _ category: DiagnosticCategory = .diagnostic) {
+        append(.error, category, message)
+        logger.error("[\(category.rawValue, privacy: .public)] \(message, privacy: .public)")
     }
 
-    private func append(_ level: DiagnosticLevel, _ message: String) {
-        events.insert(DiagnosticEvent(timestamp: Date(), level: level, message: message), at: 0)
+    private func append(_ level: DiagnosticLevel, _ category: DiagnosticCategory, _ message: String) {
+        events.insert(
+            DiagnosticEvent(timestamp: Date(), level: level, category: category, message: message),
+            at: 0
+        )
         if events.count > capacity {
             events.removeLast(events.count - capacity)
         }

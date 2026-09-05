@@ -159,7 +159,14 @@ final class PacketRecorder: ObservableObject {
     }
 
     /// Starts a fresh capture. Destructive, so the UI asks first.
+    /// Deletes the capture and starts a new one.
+    ///
+    /// Touches the file and the published counts, and nothing else. There is deliberately
+    /// no reference to CoreBluetooth anywhere in this type, so clearing cannot reach the
+    /// BLE session even indirectly — see the report on the "Clear revived the stream"
+    /// observation.
     func clear() {
+        logger.info("[REC] Clear pressed; deleting \(self.recordCount, privacy: .public) records")
         try? fileHandle?.close()
         fileHandle = nil
         try? fileManager.removeItem(at: captureURL)

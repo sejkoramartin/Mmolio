@@ -130,6 +130,10 @@ final class MedtrumBluetoothManager: NSObject, ObservableObject {
     @Published private(set) var lastReconnectReason: ReconnectReason?
     @Published private(set) var lastReconnectAt: Date?
 
+    /// Short identity for this manager instance. If a second one ever came into existence
+    /// — the lifecycle bug worth ruling out — the log would show two different values.
+    let instanceID = String(UUID().uuidString.prefix(4))
+
     /// Event log rendered at the bottom of the diagnostic screen.
     let log = DiagnosticLog(category: "ble")
 
@@ -180,7 +184,7 @@ final class MedtrumBluetoothManager: NSObject, ObservableObject {
     func start() {
         guard centralManager == nil else { return }
 
-        log.info("Starting CBCentralManager (restore id \(Self.restoreIdentifier))")
+        log.info("Manager \(instanceID): starting CBCentralManager (restore id \(Self.restoreIdentifier))", .ble)
 
         centralManager = CBCentralManager(
             delegate: self,
@@ -247,7 +251,7 @@ final class MedtrumBluetoothManager: NSObject, ObservableObject {
 
         lastReconnectReason = reason
         lastReconnectAt = Date()
-        log.info("Reconnect #\(reconnectPolicy.attempt) in \(Int(delay))s — \(reason.rawValue)")
+        log.info("Reconnect #\(reconnectPolicy.attempt) in \(Int(delay))s — \(reason.rawValue)", .ble)
 
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
             guard let self, self.reconnectGeneration == generation else { return }
@@ -397,7 +401,7 @@ final class MedtrumBluetoothManager: NSObject, ObservableObject {
             armCGMWatchdog()
 
             if update.isDuplicate {
-                log.info("Duplicate counter \(reading.counter), ignored")
+                log.info("Duplicate counter \(reading.counter), ignored", .cgm)
                 return
             }
 
@@ -436,7 +440,7 @@ extension MedtrumBluetoothManager: CBCentralManagerDelegate {
 
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
         bluetoothState = central.state
-        log.info("Bluetooth state: \(central.state.displayName)")
+        log.info("Central state: \(central.state.displayName)", .ble)
 
         guard central.state == .poweredOn else {
             connectionState = .idle
@@ -462,7 +466,7 @@ extension MedtrumBluetoothManager: CBCentralManagerDelegate {
 
     func centralManager(_ central: CBCentralManager, willRestoreState dict: [String: Any]) {
         let restored = dict[CBCentralManagerRestoredStatePeripheralsKey] as? [CBPeripheral] ?? []
-        log.info("State restoration: \(restored.count) peripheral(s)")
+        log.info("willRestoreState: \(restored.count) peripheral(s)", .ble)
 
         guard let peripheral = restored.first else { return }
 
@@ -502,7 +506,7 @@ extension MedtrumBluetoothManager: CBCentralManagerDelegate {
         // survives relaunch, so scanning is only ever needed the first time.
         UserDefaults.standard.set(peripheral.identifier.uuidString, forKey: Self.peripheralIdentifierKey)
 
-        log.info("Connected to \(peripheral.name ?? "unnamed"), discovering services")
+        log.info("didConnect \(peripheral.name ?? "unnamed") obj=\(Self.objectID(peripheral)) id=\(peripheral.identifier.uuidString.prefix(8)); delegate set, discovering services", .ble)
 
         peripheral.discoverServices([Self.serviceUUID])
     }
@@ -511,7 +515,7 @@ extension MedtrumBluetoothManager: CBCentralManagerDelegate {
                         didFailToConnect peripheral: CBPeripheral,
                         error: Error?) {
         connectionState = .disconnected
-        log.error("Failed to connect: \(error?.localizedDescription ?? "no error given")")
+        log.error("didFailToConnect: \(error?.localizedDescription ?? "no error given")", .ble)
         scheduleReconnect(reason: .connectFailed)
     }
 
@@ -523,7 +527,7 @@ extension MedtrumBluetoothManager: CBCentralManagerDelegate {
         cgmCharacteristic = nil
         cancelCGMWatchdog()
 
-        log.warning("Disconnected: \(error?.localizedDescription ?? "clean disconnect")")
+        log.warning("didDisconnect obj=\(Self.objectID(peripheral)): \(error?.localizedDescription ?? "clean disconnect")", .ble)
 
         // A disconnect we initiated already has a reconnect scheduled; adding another here
         // would run two ladders at once.
@@ -605,7 +609,7 @@ extension MedtrumBluetoothManager: CBPeripheralDelegate {
             }
 
             update(uuid: entry.uuid, service: entry.serviceUUID) { $0.subscribeAttempted = true }
-            log.info("Subscribing to \(entry.shortUUID)")
+            log.info("setNotifyValue(true) on \(entry.shortUUID)", .ble)
             peripheral.setNotifyValue(true, for: characteristic)
         }
     }
@@ -638,7 +642,7 @@ extension MedtrumBluetoothManager: CBPeripheralDelegate {
                 // never delivers is caught just like one that stops mid-stream.
                 subscribedAt = Date()
                 armCGMWatchdog()
-                log.info("CGM watchdog armed: \(Int(CGMStreamTracker.inactivityTimeout / 60)) min")
+                log.info("CGM watchdog armed: \(Int(CGMStreamTracker.inactivityTimeout / 60)) min", .cgm)
             } else {
                 cancelCGMWatchdog()
             }
@@ -646,9 +650,9 @@ extension MedtrumBluetoothManager: CBPeripheralDelegate {
 
         if characteristic.isNotifying {
             connectionState = .subscribed
-            log.info("Notifications enabled on \(shortUUID)")
+            log.info("didUpdateNotificationState \(shortUUID): isNotifying=true", .ble)
         } else {
-            log.warning("Notifications disabled on \(shortUUID)")
+            log.warning("didUpdateNotificationState \(shortUUID): isNotifying=false", .ble)
         }
     }
 
@@ -779,6 +783,15 @@ extension MedtrumBluetoothManager {
         formatter.dateFormat = "HH:mm:ss"
         return formatter
     }()
+}
+
+extension MedtrumBluetoothManager {
+
+    /// Short, stable identity for a CoreBluetooth object, so the log can show whether we
+    /// are still talking to the same peripheral instance across a reconnect.
+    static func objectID(_ object: AnyObject) -> String {
+        String(UInt(bitPattern: ObjectIdentifier(object).hashValue) % 0x10000, radix: 16)
+    }
 }
 
 // MARK: - display helpers

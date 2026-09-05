@@ -176,3 +176,70 @@ final class PacketRecordTests: XCTestCase {
         XCTAssertEqual(current?.timeIntervalSince(legacy ?? Date()) ?? 0, 0.456, accuracy: 0.001)
     }
 }
+
+// MARK: - Clear
+
+extension PacketRecordTests {
+
+    /// Clear must actually remove the previous session, not merely reset the on-screen
+    /// counter — an export taken afterwards should carry nothing from before.
+    func testClearRemovesPreviousSessionFromTheExport() throws {
+        let recorder = PacketRecorder()
+        recorder.clear()   // start from a known state, whatever a previous test left
+
+        recorder.record(characteristic: "669A9141", data: data("6F 06 0A 27"))
+        recorder.record(characteristic: "669A9141", data: data("73 06 0A 27"))
+        XCTAssertEqual(recorder.recordCount, 2)
+
+        let before = try String(contentsOf: recorder.exportCSV(), encoding: .utf8)
+        XCTAssertTrue(before.contains("6F 06 0A 27"))
+
+        recorder.clear()
+
+        XCTAssertEqual(recorder.recordCount, 0)
+        XCTAssertTrue(recorder.recentRecords.isEmpty)
+
+        let after = try String(contentsOf: recorder.exportCSV(), encoding: .utf8)
+        XCTAssertFalse(after.contains("6F 06 0A 27"), "cleared records must not survive into a new export")
+        XCTAssertFalse(after.contains("73 06 0A 27"))
+        XCTAssertEqual(after, PacketRecord.csvHeader + "\n")
+
+        recorder.clear()
+    }
+
+    func testRecordsWrittenAfterClearAreExported() throws {
+        let recorder = PacketRecorder()
+        recorder.clear()
+
+        recorder.record(characteristic: "669A9141", data: data("AA BB"))
+        let csv = try String(contentsOf: recorder.exportCSV(), encoding: .utf8)
+
+        XCTAssertTrue(csv.contains("AA BB"))
+        XCTAssertEqual(csv.split(separator: "\n").count, 2, "header plus one row")
+
+        recorder.clear()
+    }
+
+    /// The whole point of the millisecond fix: what is exported must match what was stored,
+    /// down to the subsecond, because several packets land inside one second.
+    func testExportedTimestampMatchesTheStoredTimestamp() throws {
+        let recorder = PacketRecorder()
+        recorder.clear()
+
+        let stamp = Date(timeIntervalSince1970: 1_757_000_000.317)
+        recorder.record(characteristic: "669A9141", data: data("01 02"), at: stamp)
+
+        let csv = try String(contentsOf: recorder.exportCSV(), encoding: .utf8)
+        let row = csv.split(separator: "\n")[1]
+        let exported = String(row.split(separator: ",")[0])
+
+        XCTAssertEqual(exported, PacketRecord.timestampFormatter.string(from: stamp))
+        XCTAssertTrue(exported.contains(".317"), "milliseconds lost somewhere in the pipeline: \(exported)")
+
+        let reloaded = recorder.loadAllRecords()
+        XCTAssertEqual(reloaded.count, 1)
+        XCTAssertEqual(reloaded[0].timestamp.timeIntervalSince1970, stamp.timeIntervalSince1970, accuracy: 0.001)
+
+        recorder.clear()
+    }
+}
