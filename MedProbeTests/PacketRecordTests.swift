@@ -136,8 +136,11 @@ final class PacketRecordTests: XCTestCase {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
 
+        // A timestamp with non-zero milliseconds on purpose. The original version of this
+        // test used a whole number of seconds, so it passed while the encoder was quietly
+        // truncating every stored timestamp to the second.
         let original = PacketRecord.packet(
-            timestamp: Date(timeIntervalSince1970: 1_757_000_000),
+            timestamp: Date(timeIntervalSince1970: 1_757_000_000.456),
             characteristic: characteristic9101,
             data: data("20 22 3E 02 17 03 4F 00 C8 00 E4 7F 83 00 1C 00 8E 1D")
         )
@@ -145,5 +148,32 @@ final class PacketRecordTests: XCTestCase {
         let restored = try decoder.decode(PacketRecord.self, from: try encoder.encode(original))
 
         XCTAssertEqual(restored, original)
+        XCTAssertEqual(restored.timestamp.timeIntervalSince1970,
+                       original.timestamp.timeIntervalSince1970,
+                       accuracy: 0.001,
+                       "milliseconds must survive the round trip")
+    }
+
+    func testStoredTimestampCarriesMilliseconds() {
+        let record = PacketRecord.packet(
+            timestamp: Date(timeIntervalSince1970: 1_757_000_000.456),
+            characteristic: characteristic9101,
+            data: data("01 02")
+        )
+
+        let encoded = PacketRecord.timestampFormatter.string(from: record.timestamp)
+        XCTAssertTrue(encoded.contains(".456"), "expected milliseconds in \(encoded)")
+        XCTAssertFalse(encoded.hasSuffix(".000Z"), "milliseconds were truncated")
+    }
+
+    func testCapturesWrittenWithoutMillisecondsStillLoad() {
+        // Files recorded before the encoder was fixed have whole-second timestamps.
+        // They must stay readable rather than failing the whole export.
+        let legacy = PacketRecord.parseTimestamp("2026-09-05T13:50:08Z")
+        XCTAssertNotNil(legacy)
+
+        let current = PacketRecord.parseTimestamp("2026-09-05T13:50:08.456Z")
+        XCTAssertNotNil(current)
+        XCTAssertEqual(current?.timeIntervalSince(legacy ?? Date()) ?? 0, 0.456, accuracy: 0.001)
     }
 }

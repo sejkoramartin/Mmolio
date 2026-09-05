@@ -108,6 +108,19 @@ struct PacketRecord: Codable, Equatable, Identifiable {
         return formatter
     }()
 
+    /// Same format without milliseconds, used only to read back captures written before
+    /// the fractional seconds were being persisted at all.
+    static let legacyTimestampFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
+
+    /// Parses a stored timestamp, tolerating both forms.
+    static func parseTimestamp(_ string: String) -> Date? {
+        timestampFormatter.date(from: string) ?? legacyTimestampFormatter.date(from: string)
+    }
+
     var csvRow: String {
         [
             Self.timestampFormatter.string(from: timestamp),
