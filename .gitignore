@@ -5,9 +5,32 @@ MedProbe/Info.plist
 # Xcode
 DerivedData/
 build/
+*.xcarchive
+*.ipa
+*.dSYM.zip
 *.xcuserstate
 xcuserdata/
 *.xcworkspace/xcuserdata/
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Signing material — belongs in GitHub Secrets, never in git.
+# CI enforces this too: "Assert no signing secrets are committed".
+# If one of these ever does get committed, removing it is not enough — revoke and
+# reissue the credential in Apple Developer / App Store Connect.
+# ─────────────────────────────────────────────────────────────────────────────
+*.p8
+*.p12
+*.pfx
+*.mobileprovision
+*.provisionprofile
+*.cer
+*.certSigningRequest
+*.pem
+*.key
+*.keystore
+*.jks
+ExportOptions.plist
+private_keys/
 
 # macOS
 .DS_Store

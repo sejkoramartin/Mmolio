@@ -97,3 +97,118 @@ jobs:
             exit 1
           fi
           echo "OK: no BLE write path in the source tree."
+
+      # Signing material belongs in GitHub Secrets, never in git. This checks what is
+      # actually tracked, which is the thing that would leak — .gitignore is the pair to it.
+      - name: Assert no signing secrets are committed
+        run: |
+          set -euo pipefail
+          echo "Scanning tracked files for signing artefacts..."
+          if git ls-files | grep -iE '\.(p8|p12|pfx|mobileprovision|provisionprofile|cer|certSigningRequest|pem|key|keystore|jks)$'; then
+            echo "::error::A signing artefact is committed to the repository. Remove it and rotate the credential."
+            exit 1
+          fi
+
+          # An App Store Connect key is unmistakable even if the file was renamed.
+          if git grep -lE 'BEGIN (RSA |EC |OPENSSH |)PRIVATE KEY' -- . ; then
+            echo "::error::A private key block is committed to the repository. Remove it and rotate the credential."
+            exit 1
+          fi
+
+          echo "OK: no signing artefacts tracked in git."
+
+  # Everything the TestFlight workflow does, minus the parts that need Apple credentials.
+  # This keeps the distribution path honest on every push instead of only discovering
+  # breakage the next time someone tries to ship.
+  archive-dry-run:
+    name: Unsigned device archive (distribution dry run)
+    runs-on: macos-latest
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate --spec project.yml
+
+      - name: Supported export methods for this Xcode
+        run: |
+          # Confirms that "app-store-connect" (not the deprecated "app-store") is what
+          # scripts/make-export-options.sh should be emitting.
+          xcodebuild -help | sed -n '/-exportOptionsPlist/,/^$/p' | head -60
+          echo
+          xcodebuild -help | grep -A6 -i 'method' | head -40 || true
+
+      - name: Generate and lint ExportOptions.plist
+        run: |
+          set -euo pipefail
+          # Placeholder values: this only proves the file is well-formed and complete.
+          scripts/make-export-options.sh \
+            PLACEHOLDER0 \
+            "Placeholder Profile Name" \
+            cz.sejkora.MedProbe \
+            "$RUNNER_TEMP/ExportOptions.plist"
+
+          plutil -lint "$RUNNER_TEMP/ExportOptions.plist"
+          echo
+          plutil -p "$RUNNER_TEMP/ExportOptions.plist"
+
+          METHOD=$(/usr/libexec/PlistBuddy -c "Print :method" "$RUNNER_TEMP/ExportOptions.plist")
+          if [ "$METHOD" != "app-store-connect" ]; then
+            echo "::error::Unexpected export method '$METHOD'"
+            exit 1
+          fi
+
+      - name: Archive for a real device, unsigned
+        run: |
+          set -euo pipefail
+          # generic/platform=iOS is the device destination — not a simulator archive.
+          # Signing is the only thing skipped here; it is what the TestFlight workflow adds.
+          xcodebuild archive \
+            -project MedProbe.xcodeproj \
+            -scheme MedProbe \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/MedProbe-dryrun.xcarchive" \
+            CURRENT_PROJECT_VERSION=424242 \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: Verify archive contents and version injection
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/MedProbe-dryrun.xcarchive/Products/Applications/MedProbe.app"
+          PLIST="$APP/Info.plist"
+
+          echo "=== Info.plist ==="
+          /usr/libexec/PlistBuddy -c "Print" "$PLIST"
+
+          BUNDLE_ID=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$PLIST")
+          BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$PLIST")
+          SHORT=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PLIST")
+
+          [ "$BUNDLE_ID" = "cz.sejkora.MedProbe" ] || { echo "::error::Bundle ID is $BUNDLE_ID"; exit 1; }
+          [ "$SHORT" = "0.1.0" ] || { echo "::error::Marketing version is $SHORT"; exit 1; }
+
+          # The whole point of the CFBundleVersion: $(CURRENT_PROJECT_VERSION) indirection
+          # in project.yml: a build number passed on the command line must reach the bundle,
+          # or every TestFlight upload after the first would be rejected as a duplicate.
+          if [ "$BUILD" != "424242" ]; then
+            echo "::error::Build number injection is broken: CFBundleVersion is '$BUILD', expected 424242"
+            exit 1
+          fi
+          echo "OK: build number injection works."
+
+          # An App Store build is rejected without an app icon, so check it was compiled in.
+          if [ ! -f "$APP/AppIcon60x60@2x.png" ] && ! /usr/libexec/PlistBuddy -c "Print :CFBundleIcons" "$PLIST" >/dev/null 2>&1; then
+            echo "::error::No app icon in the built product; App Store Connect would reject the upload."
+            exit 1
+          fi
+          echo "OK: app icon present."
+
+          echo "=== Background modes ==="
+          /usr/libexec/PlistBuddy -c "Print :UIBackgroundModes" "$PLIST"
