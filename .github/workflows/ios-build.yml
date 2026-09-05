@@ -162,6 +162,49 @@ jobs:
             exit 1
           fi
 
+      # The README tells the user to export their .p12 with OpenSSL's -legacy flag,
+      # because OpenSSL 3 otherwise writes PBES2/AES-256 which `security import` refuses.
+      # That claim is the most fragile step of the whole signing setup and it is cheap to
+      # check here, so the documentation cannot quietly go stale.
+      - name: Verify the README's OpenSSL .p12 recipe still holds
+        run: |
+          set -euo pipefail
+          WORK="$RUNNER_TEMP/p12check"
+          mkdir -p "$WORK"
+
+          openssl req -new -newkey rsa:2048 -nodes \
+            -keyout "$WORK/t.key" -out "$WORK/t.csr" \
+            -subj "/CN=MedProbe p12 format check/C=CZ" 2>/dev/null
+          openssl x509 -req -in "$WORK/t.csr" -signkey "$WORK/t.key" \
+            -out "$WORK/t.crt" -days 1 2>/dev/null
+
+          openssl pkcs12 -export          -inkey "$WORK/t.key" -in "$WORK/t.crt" -out "$WORK/modern.p12" -passout pass:checkpw
+          openssl pkcs12 -export -legacy  -inkey "$WORK/t.key" -in "$WORK/t.crt" -out "$WORK/legacy.p12" -passout pass:checkpw
+
+          KC="$RUNNER_TEMP/p12check.keychain-db"
+          KCPW="$(openssl rand -base64 24)"
+          security create-keychain -p "$KCPW" "$KC"
+          security unlock-keychain -p "$KCPW" "$KC"
+
+          echo "=== importing the -legacy .p12 (what the README tells the user to make) ==="
+          if security import "$WORK/legacy.p12" -P checkpw -k "$KC" -t cert -f pkcs12 -T /usr/bin/codesign; then
+            echo "OK: the -legacy .p12 imports, so the README's instructions work."
+          else
+            echo "::error::A -legacy .p12 no longer imports. The README recipe is wrong; fix it before anyone follows it."
+            security delete-keychain "$KC" || true
+            exit 1
+          fi
+
+          echo "=== importing the default OpenSSL 3 .p12 (expected to fail) ==="
+          if security import "$WORK/modern.p12" -P checkpw -k "$KC" -t cert -f pkcs12 -T /usr/bin/codesign 2>&1; then
+            echo "::warning::This runner now accepts a PBES2/AES-256 .p12 too, so -legacy is no longer strictly required. The README is still safe, just more cautious than it needs to be."
+          else
+            echo "Confirmed: the default OpenSSL 3 .p12 is rejected, which is exactly why the README insists on -legacy."
+          fi
+
+          security delete-keychain "$KC" || true
+          rm -rf "$WORK"
+
       - name: Archive for a real device, unsigned
         run: |
           set -euo pipefail
