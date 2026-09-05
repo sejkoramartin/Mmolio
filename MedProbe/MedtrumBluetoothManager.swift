@@ -50,7 +50,18 @@ final class MedtrumBluetoothManager: NSObject, ObservableObject {
     static let serviceUUID = CBUUID(string: "669A9001-0008-968F-E311-6050405558B3")
 
     /// Notification characteristic carrying CGM glucose packets. Subscribe only — never write.
+    ///
+    /// Note: physical testing found this characteristic subscribes successfully and then
+    /// never delivers anything on this pump. It is kept subscribed and decoded in case it
+    /// becomes active, but the live traffic is on the two below.
     static let cgmNotifyCharacteristicUUID = CBUUID(string: "669A9141-0008-968F-E311-6050405558B3")
+
+    /// AndroidAPS READ_UUID: the pump's field-mask notification stream.
+    static let notificationCharacteristicUUID = CBUUID(string: "669A9120-0008-968F-E311-6050405558B3")
+
+    /// AndroidAPS WRITE_UUID: fragmented replies. AndroidAPS both sends commands here and
+    /// reads the answers; MedProbe only ever watches the answers EasyPatch provokes.
+    static let fragmentStreamCharacteristicUUID = CBUUID(string: "669A9101-0008-968F-E311-6050405558B3")
 
     /// Medtrum pumps advertise with a name starting "MT".
     static let expectedNamePrefix = "MT"
@@ -73,11 +84,24 @@ final class MedtrumBluetoothManager: NSObject, ObservableObject {
     /// notification counts. Present to answer why notifications never arrived on 669A9141.
     @Published private(set) var characteristics: [DiagnosticCharacteristic] = []
 
+    /// Most recent parsed 669A9120 notification.
+    @Published private(set) var lastNotification: MedtrumNotification?
+
+    /// Most recent fully reassembled 669A9101 message.
+    @Published private(set) var lastAssembledFrame: AssembledFrame?
+
+    /// Completed reassemblies this session.
+    @Published private(set) var assembledFrameCount: Int = 0
+
     /// Event log rendered at the bottom of the diagnostic screen.
     let log = DiagnosticLog(category: "ble")
 
     /// Persistent capture of every notification, for offline analysis.
     let recorder = PacketRecorder()
+
+    /// Reassembles the fragmented 669A9101 stream. Read-only: it consumes fragments and
+    /// produces messages, and has no path back to the pump.
+    private let fragmentAssembler = MedtrumFrameAssembler()
 
     // MARK: - private state
 
@@ -430,14 +454,57 @@ extension MedtrumBluetoothManager: CBPeripheralDelegate {
         }
         log.info("NOTIFY \(shortUUID) len=\(value.count) hex=\(hex)")
 
-        // Only the known CGM characteristic is decoded as glucose. Anything else is
-        // recorded and left alone: we will not guess at the meaning of unknown packets.
-        guard characteristic.uuid == Self.cgmNotifyCharacteristicUUID else {
-            log.info("Not decoding \(shortUUID): not the known CGM characteristic")
-            return
-        }
+        switch characteristic.uuid {
+        case Self.cgmNotifyCharacteristicUUID:
+            handleNotification(value)
 
-        handleNotification(value)
+        case Self.notificationCharacteristicUUID:
+            handleFieldMaskNotification(value)
+
+        case Self.fragmentStreamCharacteristicUUID:
+            handleFragment(value)
+
+        default:
+            log.info("No parser for \(shortUUID); packet recorded only")
+        }
+    }
+
+    // MARK: - AndroidAPS-derived parsing
+
+    /// Parses a 669A9120 field-mask notification. Reports what the pump said; sends nothing.
+    private func handleFieldMaskNotification(_ data: Data) {
+        switch MedtrumNotificationParser.parse(data) {
+        case .success(let notification):
+            lastNotification = notification
+
+            let summary = notification.fields
+                .map { $0.interpretation.map { text in "\($0.name): \(text)" } ?? "\($0.name)=\($0.hex)" }
+                .joined(separator: ", ")
+            log.info(String(format: "9120 state=0x%02X mask=0x%04X %@",
+                            notification.stateRaw, notification.fieldMask, summary))
+
+        case .failure(let error):
+            log.warning("9120 parse failed: \(String(describing: error))")
+        }
+    }
+
+    /// Feeds a 669A9101 fragment to the reassembler. Purely passive: we are watching
+    /// replies to commands EasyPatch sent, and never provoke one ourselves.
+    private func handleFragment(_ data: Data) {
+        switch fragmentAssembler.accept(data) {
+        case .accumulating(let fragmentCount, let have, let need):
+            log.info("9101 fragment \(fragmentCount) accumulating, \(have)/\(need) bytes")
+
+        case .completed(let frame):
+            lastAssembledFrame = frame
+            assembledFrameCount += 1
+            log.info("9101 message reassembled: \(frame.fragmentCount) fragments, \(frame.payload.count) bytes, checksums \(frame.isIntact ? "valid" : "INVALID")")
+            // The reassembled payload is deliberately not interpreted.
+            recorder.record(characteristic: "9101-ASSEMBLED", data: Data(frame.payload))
+
+        case .discarded(let reason):
+            log.warning("9101 fragment discarded: \(reason)")
+        }
     }
 }
 

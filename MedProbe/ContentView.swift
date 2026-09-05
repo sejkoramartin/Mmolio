@@ -31,6 +31,7 @@ struct ContentView: View {
         NavigationStack {
             List {
                 statusSection
+                protocolSection
                 captureSection
                 characteristicsSection
                 glucoseSection
@@ -55,6 +56,75 @@ struct ContentView: View {
             }
             .sheet(item: $exportFile) { file in
                 ShareSheet(url: file.url)
+            }
+        }
+    }
+
+    // MARK: - protocol
+
+    /// What the AndroidAPS-derived parsers make of the live traffic.
+    @ViewBuilder
+    private var protocolSection: some View {
+        Section("Protocol (669A9120)") {
+            if let notification = bluetoothManager.lastNotification {
+                row("State", String(format: "0x%02X", notification.stateRaw))
+                row("Field mask", String(format: "0x%04X", notification.fieldMask))
+
+                ForEach(notification.fields, id: \.mask) { field in
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack {
+                            Text(field.name)
+                                .font(.caption)
+                            Spacer()
+                            Text(field.interpretation ?? "not decoded")
+                                .font(.caption)
+                                .foregroundStyle(field.interpretation == nil ? .orange : .secondary)
+                        }
+                        Text(field.hex)
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 1)
+                }
+
+                if let cgm = bluetoothManager.lastNotification?.cgmFieldBytes {
+                    let hex = cgm.map { String(format: "%02X", $0) }.joined(separator: " ")
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("CGM field — meaning unknown")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.orange)
+                        Text(hex)
+                            .font(.system(.caption, design: .monospaced))
+                            .textSelection(.enabled)
+                        Text("AndroidAPS reserves these 5 bytes and does not decode them.")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 2)
+                }
+            } else {
+                Text("No 669A9120 notification parsed yet")
+                    .foregroundStyle(.secondary)
+            }
+        }
+
+        Section("Reassembly (669A9101)") {
+            row("Messages", "\(bluetoothManager.assembledFrameCount)")
+
+            if let frame = bluetoothManager.lastAssembledFrame {
+                row("Fragments", "\(frame.fragmentCount)")
+                row("Declared length", "\(frame.declaredLength)")
+                row("Checksums", frame.isIntact ? "valid" : "invalid")
+                Text(frame.hex)
+                    .font(.system(size: 9, design: .monospaced))
+                    .textSelection(.enabled)
+                    .lineLimit(6)
+                Text("Reassembled only. Contents deliberately not interpreted.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("No complete message yet")
+                    .foregroundStyle(.secondary)
             }
         }
     }
