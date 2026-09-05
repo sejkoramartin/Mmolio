@@ -333,3 +333,30 @@ extension MedtrumProtocolTests {
         ], "reservoir is device status, not delivery, and stays visible")
     }
 }
+
+// MARK: - CGM state byte
+
+extension MedtrumProtocolTests {
+
+    func testCGMStateByteIsTheFirstByteOfTheCGMField() throws {
+        // 2026-09-05 11:40-11:48, while 669A9141 was delivering packets.
+        let streaming = try parse("20 22 10 00 58 00 45 07 03 88 01 46 0F")
+        XCTAssertEqual(streaming.cgmStateByte, 0x03)
+
+        // Same session after 11:49, when 669A9141 had gone quiet.
+        let quiet = try parse("20 22 10 00 58 00 45 07 00 88 01 46 0F")
+        XCTAssertEqual(quiet.cgmStateByte, 0x00)
+
+        // The rest of the field was identical in both.
+        XCTAssertEqual(Array(streaming.cgmFieldBytes?.dropFirst() ?? []),
+                       Array(quiet.cgmFieldBytes?.dropFirst() ?? []))
+    }
+
+    func testCGMStateByteIsNilWhenTheFieldIsAbsent() throws {
+        // A mask without 0x1000 carries no CGM field at all.
+        let notification = try parse("20 20 00 45 07")
+        XCTAssertEqual(notification.fieldMask, 0x0020)
+        XCTAssertNil(notification.cgmFieldBytes)
+        XCTAssertNil(notification.cgmStateByte)
+    }
+}

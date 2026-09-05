@@ -87,6 +87,12 @@ final class MedtrumBluetoothManager: NSObject, ObservableObject {
     /// Most recent parsed 669A9120 notification.
     @Published private(set) var lastNotification: MedtrumNotification?
 
+    /// First byte of the CGM field in the most recent 669A9120 notification, and when it
+    /// last changed. Surfaced because it is currently our only visible predictor of
+    /// whether 669A9141 will deliver anything.
+    @Published private(set) var cgmStateByte: UInt8?
+    @Published private(set) var cgmStateChangedAt: Date?
+
     /// Last reported reservoir level in units, and when it arrived. Kept separately because
     /// notifications do not carry this field every time, so the latest known value should
     /// survive the ones that omit it.
@@ -486,6 +492,15 @@ extension MedtrumBluetoothManager: CBPeripheralDelegate {
             if let units = notification.reservoirUnits {
                 reservoirUnits = units
                 reservoirUpdatedAt = Date()
+            }
+
+            if let state = notification.cgmStateByte, state != cgmStateByte {
+                let previous = cgmStateByte
+                cgmStateByte = state
+                cgmStateChangedAt = Date()
+                log.warning(String(format: "CGM state byte %@ -> 0x%02X",
+                                   previous.map { String(format: "0x%02X", $0) } ?? "none",
+                                   state))
             }
 
             // Therapy fields are withheld from the standard log. The count is still

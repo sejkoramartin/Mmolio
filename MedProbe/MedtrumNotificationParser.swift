@@ -62,6 +62,17 @@ struct MedtrumNotification: Equatable {
         fields.first { $0.mask == MedtrumNotificationParser.maskUnusedCGM }?.bytes
     }
 
+    /// First byte of the CGM field.
+    ///
+    /// Observationally this tracks whether the pump is pushing CGM packets on 669A9141:
+    /// across two captures, packets arrived only while this byte was 0x03, and stopped
+    /// within a minute of it changing. What the value *means* is unknown — this is a
+    /// correlation from two sessions, not a documented state machine, and AndroidAPS does
+    /// not decode this field at all.
+    var cgmStateByte: UInt8? {
+        cgmFieldBytes?.first
+    }
+
     /// Fields safe to show without diagnostic mode: everything that is not about therapy.
     var nonTherapyFields: [NotificationField] {
         fields.filter { !$0.isTherapyData }

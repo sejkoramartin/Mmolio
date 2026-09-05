@@ -231,6 +231,26 @@ struct ContentView: View {
             row("State", bluetoothManager.connectionState.rawValue)
             row("Packets", "\(bluetoothManager.packetsReceived)")
 
+            if let state = bluetoothManager.cgmStateByte {
+                let changed = bluetoothManager.cgmStateChangedAt
+                    .map { Self.timeFormatter.string(from: $0) } ?? "—"
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack {
+                        Text("CGM state byte")
+                        Spacer()
+                        Text(String(format: "0x%02X", state))
+                            .font(.system(.body, design: .monospaced))
+                            .foregroundStyle(state == 0x03 ? .green : .orange)
+                    }
+                    Text(state == 0x03
+                         ? "Packets on 669A9141 have only ever been seen while this is 0x03."
+                         : "669A9141 has stayed silent whenever this was not 0x03. Changed at \(changed).")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 2)
+            }
+
             if let units = bluetoothManager.reservoirUnits {
                 let age = bluetoothManager.reservoirUpdatedAt.map { Self.timeFormatter.string(from: $0) } ?? "—"
                 row("Reservoir", String(format: "%.2f U  (%@)", units, age))
