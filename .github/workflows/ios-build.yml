@@ -234,8 +234,24 @@ jobs:
           BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$PLIST")
           SHORT=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PLIST")
 
+          # The bundle ID is a fixed contract with App Store Connect, so it is asserted
+          # literally: an accidental change should fail here.
           [ "$BUNDLE_ID" = "cz.sejkora.MedProbe" ] || { echo "::error::Bundle ID is $BUNDLE_ID"; exit 1; }
-          [ "$SHORT" = "0.1.0" ] || { echo "::error::Marketing version is $SHORT"; exit 1; }
+
+          # The marketing version is meant to change, so read the expectation from
+          # project.yml rather than hardcoding it. What is being checked is that the value
+          # in the spec reaches the bundle, not that it holds any particular number.
+          EXPECTED_SHORT=$(grep -E '^[[:space:]]+MARKETING_VERSION:' project.yml | head -1 | sed -E 's/.*"(.*)".*/\1/')
+          if [ -z "$EXPECTED_SHORT" ]; then
+            echo "::error::Could not read MARKETING_VERSION from project.yml"
+            exit 1
+          fi
+          if [ "$SHORT" != "$EXPECTED_SHORT" ]; then
+            echo "::error::CFBundleShortVersionString is '$SHORT', but project.yml says '$EXPECTED_SHORT'"
+            exit 1
+          fi
+          echo "OK: marketing version $SHORT matches project.yml."
+
 
           # The whole point of the CFBundleVersion: $(CURRENT_PROJECT_VERSION) indirection
           # in project.yml: a build number passed on the command line must reach the bundle,
