@@ -34,6 +34,7 @@ struct ContentView: View {
         NavigationStack {
             List {
                 statusSection
+                streamHealthSection
                 protocolSection
                 captureSection
                 characteristicsSection
@@ -59,6 +60,71 @@ struct ContentView: View {
             }
             .sheet(item: $exportFile) { file in
                 ShareSheet(url: file.url)
+            }
+        }
+    }
+
+    // MARK: - stream health
+
+    /// Everything needed to judge whether the CGM stream is actually working, without
+    /// exporting a capture to find out.
+    private var streamHealthSection: some View {
+        Section("CGM stream (669A9141)") {
+            HStack {
+                Text("Notifying")
+                Spacer()
+                Text(bluetoothManager.isCGMCharacteristicNotifying ? "yes" : "no")
+                    .foregroundStyle(bluetoothManager.isCGMCharacteristicNotifying ? .green : .orange)
+            }
+
+            if let last = bluetoothManager.lastValidCGMPacketAt {
+                let age = Int(Date().timeIntervalSince(last) / 60)
+                HStack {
+                    Text("Last packet")
+                    Spacer()
+                    Text("\(Self.timeFormatter.string(from: last))  (\(age) min)")
+                        .foregroundStyle(age >= 7 ? .red : age >= 4 ? .orange : .secondary)
+                        .monospacedDigit()
+                }
+            } else {
+                row("Last packet", "never")
+            }
+
+            row("Readings", "\(bluetoothManager.cgmReadingCount)")
+
+            if bluetoothManager.backfilledReadingCount > 0 {
+                row("Backfilled", "\(bluetoothManager.backfilledReadingCount)")
+            }
+            if bluetoothManager.missedCycleCount > 0 {
+                row("Missed cycles", "\(bluetoothManager.missedCycleCount)")
+            }
+
+            row("Reconnects", "\(bluetoothManager.reconnectCount)")
+
+            if let reason = bluetoothManager.lastReconnectReason {
+                let when = bluetoothManager.lastReconnectAt
+                    .map { Self.timeFormatter.string(from: $0) } ?? "—"
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Last reconnect")
+                        .font(.caption)
+                    Text("\(reason.rawValue) at \(when)")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if !bluetoothManager.lastBackfilled.isEmpty {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Recovered from history")
+                        .font(.caption.weight(.semibold))
+                    ForEach(bluetoothManager.lastBackfilled, id: \.counter) { reading in
+                        Text(String(format: "%.1f mmol/L  counter %d  %@",
+                                    reading.mmoll, reading.counter,
+                                    Self.timeFormatter.string(from: reading.timestamp)))
+                            .font(.system(.caption2, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
         }
     }

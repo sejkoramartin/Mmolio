@@ -105,6 +105,31 @@ final class MedtrumBluetoothManager: NSObject, ObservableObject {
     /// Completed reassemblies this session.
     @Published private(set) var assembledFrameCount: Int = 0
 
+    // MARK: - stream health metrics
+
+    /// When the last valid CGM packet arrived.
+    @Published private(set) var lastValidCGMPacketAt: Date?
+
+    /// Live CGM readings delivered this session.
+    @Published private(set) var cgmReadingCount: Int = 0
+
+    /// Readings recovered from packet history slots.
+    @Published private(set) var backfilledReadingCount: Int = 0
+
+    /// Cycles the counter says we never saw, live or backfilled.
+    @Published private(set) var missedCycleCount: Int = 0
+
+    /// Whether 669A9141 currently reports itself as notifying.
+    @Published private(set) var isCGMCharacteristicNotifying = false
+
+    /// Readings recovered by the most recent backfill, newest last.
+    @Published private(set) var lastBackfilled: [BackfilledReading] = []
+
+    /// Reconnects performed this session, and why the last one happened.
+    @Published private(set) var reconnectCount: Int = 0
+    @Published private(set) var lastReconnectReason: ReconnectReason?
+    @Published private(set) var lastReconnectAt: Date?
+
     /// Event log rendered at the bottom of the diagnostic screen.
     let log = DiagnosticLog(category: "ble")
 
@@ -122,8 +147,31 @@ final class MedtrumBluetoothManager: NSObject, ObservableObject {
     /// The pump we are talking to, retained so reconnects and restoration can find it again.
     private var pumpPeripheral: CBPeripheral?
 
-    /// Delay before retrying a dropped link. EasyPatch owns the session; do not hammer it.
-    private let reconnectDelay: TimeInterval = 10
+    /// The CGM characteristic, retained so a recycle can unsubscribe explicitly.
+    private var cgmCharacteristic: CBCharacteristic?
+
+    /// Bounded backoff, matching upstream. EasyPatch owns the session; do not hammer it.
+    private var reconnectPolicy = ReconnectPolicy()
+
+    /// Health of the 669A9141 glucose stream: watchdog, duplicates and backfill.
+    private var streamTracker = CGMStreamTracker()
+
+    /// When we last subscribed, so the watchdog has a reference before the first packet.
+    private var subscribedAt: Date?
+
+    /// Generation counters let a newly armed timer invalidate the previous one without
+    /// holding Timer objects; a stale fire simply finds a mismatched generation.
+    private var watchdogGeneration = 0
+    private var reconnectGeneration = 0
+
+    /// True while a recycle is in flight, so a disconnect we caused does not schedule a
+    /// second reconnect on top of the one already pending.
+    private var isRecycling = false
+
+    /// Key under which the pump's identifier is persisted, so reconnects and relaunches
+    /// can go straight to the known peripheral instead of scanning — which upstream
+    /// MedtrumKit notes is "the only thing that works while backgrounded".
+    private static let peripheralIdentifierKey = "medtrum.peripheralIdentifier"
 
     // MARK: - lifecycle
 
@@ -190,16 +238,114 @@ final class MedtrumBluetoothManager: NSObject, ObservableObject {
         ])
     }
 
-    private func scheduleReconnect() {
-        guard let central = centralManager, let peripheral = pumpPeripheral else { return }
+    private func scheduleReconnect(reason: ReconnectReason) {
+        guard let central = centralManager else { return }
 
-        log.info("Reconnect scheduled in \(Int(reconnectDelay)) s")
+        let delay = reconnectPolicy.nextDelay()
+        reconnectGeneration += 1
+        let generation = reconnectGeneration
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + reconnectDelay) { [weak self, weak peripheral] in
-            guard let self, let peripheral, central.state == .poweredOn else { return }
-            guard peripheral.state == .disconnected else { return }
-            self.connect(to: peripheral, using: central)
+        lastReconnectReason = reason
+        lastReconnectAt = Date()
+        log.info("Reconnect #\(reconnectPolicy.attempt) in \(Int(delay))s — \(reason.rawValue)")
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            guard let self, self.reconnectGeneration == generation else { return }
+            guard central.state == .poweredOn else {
+                self.log.warning("Reconnect skipped: Bluetooth is \(central.state.displayName)")
+                return
+            }
+
+            self.isRecycling = false
+            self.reconnectCount += 1
+
+            // Prefer the exact peripheral we know. Scanning is the last resort, and it is
+            // useless in the background — the pump is not advertising while EasyPatch
+            // holds the link.
+            if let peripheral = self.knownPeripheral(using: central) {
+                self.connect(to: peripheral, using: central)
+            } else {
+                self.log.warning("Known peripheral unavailable, falling back to discovery")
+                self.findPump(using: central)
+            }
         }
+    }
+
+    /// The pump we already know about: the retained reference if we still hold one,
+    /// otherwise looked up by the identifier we persisted.
+    private func knownPeripheral(using central: CBCentralManager) -> CBPeripheral? {
+        if let peripheral = pumpPeripheral {
+            return peripheral
+        }
+
+        guard let stored = UserDefaults.standard.string(forKey: Self.peripheralIdentifierKey),
+              let identifier = UUID(uuidString: stored) else { return nil }
+
+        let peripheral = central.retrievePeripherals(withIdentifiers: [identifier]).first
+        if peripheral != nil {
+            log.info("Recovered known peripheral \(stored) by identifier")
+        }
+        return peripheral
+    }
+
+    // MARK: - CGM stream watchdog
+
+    /// Arms the inactivity watchdog. A healthy sensor notifies every two minutes; upstream
+    /// allows seven before deciding an apparently connected session is stale.
+    ///
+    /// This is the mechanism MedProbe was missing. Previously, when 669A9141 stopped
+    /// delivering while the link stayed up, nothing noticed and nothing recovered.
+    private func armCGMWatchdog() {
+        watchdogGeneration += 1
+        let generation = watchdogGeneration
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + CGMStreamTracker.inactivityTimeout) { [weak self] in
+            guard let self, self.watchdogGeneration == generation else { return }
+            self.checkCGMStreamHealth()
+        }
+    }
+
+    private func cancelCGMWatchdog() {
+        watchdogGeneration += 1
+    }
+
+    private func checkCGMStreamHealth() {
+        guard let peripheral = pumpPeripheral, peripheral.state == .connected else { return }
+        guard let since = subscribedAt else { return }
+
+        guard streamTracker.isStale(now: Date(), since: since) else {
+            armCGMWatchdog()
+            return
+        }
+
+        let age = streamTracker.packetAge(now: Date()).map { Int($0 / 60) }
+        log.error("No valid CGM packet for \(Int(CGMStreamTracker.inactivityTimeout / 60))+ min (last: \(age.map { "\($0) min ago" } ?? "never")). Recycling our connection.")
+
+        recycleConnection(reason: .cgmStreamStalled)
+    }
+
+    /// Drops and rebuilds *our* CoreBluetooth connection.
+    ///
+    /// This affects only MedProbe's view of the link. EasyPatch keeps its own connection;
+    /// iOS reference-counts the underlying ACL link, so cancelling ours does not take the
+    /// pump away from the app that owns the session.
+    private func recycleConnection(reason: ReconnectReason) {
+        guard let central = centralManager, let peripheral = pumpPeripheral else { return }
+        guard !isRecycling else { return }
+
+        isRecycling = true
+        cancelCGMWatchdog()
+
+        // Unsubscribe before dropping the link. If the subscription itself went stale,
+        // tearing it down explicitly is the part that matters.
+        if let characteristic = cgmCharacteristic, characteristic.isNotifying {
+            peripheral.setNotifyValue(false, for: characteristic)
+        }
+
+        connectionState = .disconnected
+        central.cancelPeripheralConnection(peripheral)
+
+        scheduleReconnect(reason: reason)
     }
 
     // MARK: - characteristic bookkeeping (temporary diagnostic)
@@ -240,9 +386,41 @@ final class MedtrumBluetoothManager: NSObject, ObservableObject {
             lastReading = reading
             lastRejectedPacketHex = nil
             lastRejectionReason = nil
+
+            // A valid packet is the only thing that proves the session works. Reset the
+            // backoff here, not on didConnect: connecting and then receiving nothing is
+            // precisely the failure being recovered from.
+            reconnectPolicy.reset()
+
+            let update = streamTracker.accept(reading)
+            lastValidCGMPacketAt = streamTracker.lastValidPacketAt
+            armCGMWatchdog()
+
+            if update.isDuplicate {
+                log.info("Duplicate counter \(reading.counter), ignored")
+                return
+            }
+
+            cgmReadingCount = streamTracker.deliveredCount
+            backfilledReadingCount = streamTracker.backfilledCount
+            missedCycleCount = streamTracker.missedCycleCount
+
             log.info(String(format: "Glucose decoded %.1f mg/dL (%.1f mmol/L) raw=%d cal=%d counter=%d",
                             reading.mgdl, reading.mmoll,
                             Int(reading.rawGlucose), Int(reading.calibrationFactor), reading.counter))
+
+            if update.missedCycles > 0 {
+                log.warning("Gap of \(update.missedCycles) cycle(s); recovered \(update.backfilled.count) from history")
+                for recovered in update.backfilled {
+                    log.info(String(format: "Backfilled %.1f mmol/L (counter=%d, %@)",
+                                    recovered.mmoll, recovered.counter,
+                                    Self.timeFormatter.string(from: recovered.timestamp)))
+                    recorder.record(characteristic: "CGM-BACKFILL",
+                                    data: Data(),
+                                    at: recovered.timestamp)
+                }
+                lastBackfilled = update.backfilled
+            }
 
         case .failure(let error):
             lastRejectedPacketHex = MedtrumPacketDecoder.hexString(data)
@@ -317,6 +495,13 @@ extension MedtrumBluetoothManager: CBCentralManagerDelegate {
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         connectionState = .connected
         pumpName = peripheral.name ?? pumpName
+        pumpPeripheral = peripheral
+        peripheral.delegate = self
+
+        // Only identifiers that actually produced a connection are stored, and the value
+        // survives relaunch, so scanning is only ever needed the first time.
+        UserDefaults.standard.set(peripheral.identifier.uuidString, forKey: Self.peripheralIdentifierKey)
+
         log.info("Connected to \(peripheral.name ?? "unnamed"), discovering services")
 
         peripheral.discoverServices([Self.serviceUUID])
@@ -327,15 +512,24 @@ extension MedtrumBluetoothManager: CBCentralManagerDelegate {
                         error: Error?) {
         connectionState = .disconnected
         log.error("Failed to connect: \(error?.localizedDescription ?? "no error given")")
-        scheduleReconnect()
+        scheduleReconnect(reason: .connectFailed)
     }
 
     func centralManager(_ central: CBCentralManager,
                         didDisconnectPeripheral peripheral: CBPeripheral,
                         error: Error?) {
         connectionState = .disconnected
+        isCGMCharacteristicNotifying = false
+        cgmCharacteristic = nil
+        cancelCGMWatchdog()
+
         log.warning("Disconnected: \(error?.localizedDescription ?? "clean disconnect")")
-        scheduleReconnect()
+
+        // A disconnect we initiated already has a reconnect scheduled; adding another here
+        // would run two ladders at once.
+        guard !isRecycling else { return }
+
+        scheduleReconnect(reason: .disconnected)
     }
 }
 
@@ -390,12 +584,24 @@ extension MedtrumBluetoothManager: CBPeripheralDelegate {
 
             log.info("Characteristic \(characteristic.uuid.uuidString) properties \(raw) [\(entry.propertiesDescription)] isNotifying=\(characteristic.isNotifying)")
 
-            // TEMPORARY DIAGNOSTIC: subscribe to everything that can push data, not just
-            // the known CGM characteristic. Subscribing is a read-only act — it enables a
-            // notification, it does not send the pump a command.
             guard entry.supportsNotifications else {
                 log.info("Not subscribing to \(entry.shortUUID): no notify or indicate property")
                 continue
+            }
+
+            // Production mode listens to the glucose characteristic alone, keeping the BLE
+            // footprint to what MedProbe actually needs. Diagnostic mode subscribes to
+            // everything that can push data, which is how 9101 and 9120 were mapped in the
+            // first place. Subscribing is read-only either way: it enables a notification,
+            // it does not send the pump a command.
+            let diagnosticMode = MedProbeConstants.isDiagnosticModeEnabled
+            if !diagnosticMode && characteristic.uuid != Self.cgmNotifyCharacteristicUUID {
+                log.info("Not subscribing to \(entry.shortUUID): production mode listens to CGM only")
+                continue
+            }
+
+            if characteristic.uuid == Self.cgmNotifyCharacteristicUUID {
+                cgmCharacteristic = characteristic
             }
 
             update(uuid: entry.uuid, service: entry.serviceUUID) { $0.subscribeAttempted = true }
@@ -422,6 +628,20 @@ extension MedtrumBluetoothManager: CBPeripheralDelegate {
         update(uuid: characteristic.uuid.uuidString, service: serviceUUID) {
             $0.isNotifying = characteristic.isNotifying
             $0.subscribeError = nil
+        }
+
+        if characteristic.uuid == Self.cgmNotifyCharacteristicUUID {
+            isCGMCharacteristicNotifying = characteristic.isNotifying
+
+            if characteristic.isNotifying {
+                // The watchdog measures from here, so a session that subscribes and then
+                // never delivers is caught just like one that stops mid-stream.
+                subscribedAt = Date()
+                armCGMWatchdog()
+                log.info("CGM watchdog armed: \(Int(CGMStreamTracker.inactivityTimeout / 60)) min")
+            } else {
+                cancelCGMWatchdog()
+            }
         }
 
         if characteristic.isNotifying {
@@ -549,6 +769,16 @@ extension MedtrumBluetoothManager: CBPeripheralDelegate {
             log.warning("9101 fragment discarded: \(reason)")
         }
     }
+}
+
+extension MedtrumBluetoothManager {
+
+    /// Short time format used in log lines about backfilled readings.
+    static let timeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm:ss"
+        return formatter
+    }()
 }
 
 // MARK: - display helpers
