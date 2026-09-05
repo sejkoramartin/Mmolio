@@ -1,0 +1,99 @@
+name: iOS build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and test (iOS Simulator)
+    runs-on: macos-latest
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Toolchain versions
+        run: |
+          echo "=== macOS ==="
+          sw_vers
+          uname -m
+          echo
+          echo "=== Xcode ==="
+          xcode-select -p
+          xcodebuild -version
+          echo
+          echo "=== Swift ==="
+          swift --version
+          echo
+          echo "=== Available SDKs ==="
+          xcodebuild -showsdks
+
+      - name: Install XcodeGen
+        run: |
+          brew install xcodegen
+          xcodegen --version
+
+      - name: Generate Xcode project
+        run: |
+          xcodegen generate --spec project.yml
+          echo
+          echo "=== Schemes and targets ==="
+          xcodebuild -list -project MedProbe.xcodeproj
+
+      # No Apple Developer account is involved in stage 1. Everything below builds for
+      # the simulator with signing disabled, which is enough to prove the code compiles.
+      - name: Select a simulator destination
+        id: destination
+        run: |
+          set -euo pipefail
+          echo "=== Available simulators ==="
+          xcrun simctl list devices available
+          echo
+          DEVICE_LINE=$(xcrun simctl list devices available | grep -E '^ +iPhone' | tail -1)
+          if [ -z "$DEVICE_LINE" ]; then
+            echo "::error::No available iPhone simulator on this runner"
+            exit 1
+          fi
+          UDID=$(echo "$DEVICE_LINE" | grep -oE '[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}' | head -1)
+          echo "Selected simulator: $DEVICE_LINE"
+          echo "UDID: $UDID"
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        run: |
+          xcodebuild build \
+            -project MedProbe.xcodeproj \
+            -scheme MedProbe \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,id=${{ steps.destination.outputs.udid }}" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: Unit tests (MedtrumPacketDecoder)
+        run: |
+          xcodebuild test \
+            -project MedProbe.xcodeproj \
+            -scheme MedProbe \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,id=${{ steps.destination.outputs.udid }}" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      # Belt and braces: the safety contract is enforced by CI, not just by review.
+      # MedProbe is a passive CGM listener and must never gain a BLE write path.
+      - name: Assert no BLE write path exists
+        run: |
+          echo "Scanning sources for any write mechanism..."
+          if grep -rnE 'writeValue|CBCharacteristicWriteType|withResponse|withoutResponse|setDesiredConnectionLatency|CBPeripheralManager' MedProbe MedProbeTests; then
+            echo "::error::A BLE write path was found. MedProbe must stay read-only."
+            exit 1
+          fi
+          echo "OK: no BLE write path in the source tree."
