@@ -32,8 +32,11 @@ enum MedtrumDecodeError: Error, Equatable {
         case .invalidLength(let actual):
             return "unexpected packet length \(actual), expected \(MedtrumPacketDecoder.expectedPacketLength)"
         case .invalidPacketMarker(let actual):
-            return String(format: "packet marker 0x%02X at offset 1 is not 0x%02X",
-                          actual, MedtrumPacketDecoder.cgmPacketMarker)
+            let known = MedtrumPacketDecoder.cgmPacketMarkers
+                .sorted()
+                .map { String(format: "0x%02X", $0) }
+                .joined(separator: "/")
+            return String(format: "packet marker 0x%02X at offset 1 is not one of %@", actual, known)
         case .zeroCalibrationFactor:
             return "calibration factor is 0"
         case .implausibleGlucose(let mgdl):
@@ -69,7 +72,15 @@ enum MedtrumPacketDecoder {
     static let expectedPacketLength = 20
 
     /// Byte 1 distinguishes a CGM glucose packet from other traffic on the same characteristic.
-    static let cgmPacketMarker: UInt8 = 0x02
+    ///
+    /// The xDrip4iOS reference documents 0x02, alongside 0xB3 at offset 0. This pump sends
+    /// 0x06 with 0x6F at offset 0, and the rest of the layout is identical — verified on
+    /// 2026-09-05 against EasyPatch, where four consecutive packets decoded to within
+    /// 0.03 mmol/L of the values EasyPatch displayed.
+    ///
+    /// Kept as an explicit list rather than dropped altogether: accepting any byte here
+    /// would leave unrelated 20-byte traffic to the plausibility gate alone.
+    static let cgmPacketMarkers: Set<UInt8> = [0x02, 0x06]
 
     // MARK: - byte offsets
 
@@ -102,7 +113,7 @@ enum MedtrumPacketDecoder {
         }
 
         let marker = byte(data, at: offsetPacketMarker)
-        guard marker == cgmPacketMarker else {
+        guard cgmPacketMarkers.contains(marker) else {
             return .failure(.invalidPacketMarker(actual: marker))
         }
 

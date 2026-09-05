@@ -4,13 +4,19 @@
 //
 //  Decoder tests. No CoreBluetooth, no radio, no device.
 //
-//  IMPORTANT — about the test data:
-//  Every packet in this file is SYNTHETIC. It is assembled byte by byte to exercise the
-//  decoder's arithmetic and validation, and it is NOT a captured real-world Medtrum packet.
-//  The only values taken from the public xDrip4iOS reference implementation are the packet
-//  layout (offsets), the 0x02 marker, and the observed calibration factors 8932 / 10333,
-//  which that source documents as verified against EasyPatch ground truth. Nothing else here
-//  claims to be real captured traffic.
+//  IMPORTANT — about the test data, which is now of two kinds:
+//
+//  1. SYNTHETIC frames, built byte by byte by makeSyntheticPacket, used to exercise the
+//     arithmetic and the validation rules. These are not captured traffic and do not
+//     claim to be. Their layout comes from the xDrip4iOS reference implementation, as do
+//     the 0x02 marker and the calibration factors 8932 / 10333.
+//
+//  2. REAL packets, in the final extension, captured from this pump on 2026-09-05 along
+//     with the values EasyPatch displayed at the same time. These are the project's only
+//     ground truth and are asserted precisely.
+//
+//  Keep the two clearly separated: a synthetic frame proves the code does what we told it
+//  to, and only a real one proves we told it the right thing.
 //
 
 import XCTest
@@ -235,5 +241,88 @@ final class MedtrumPacketDecoderTests: XCTestCase {
         XCTAssertEqual(reading.historyMgdl.count, 3)
         XCTAssertEqual(reading.historyMgdl[0], 1020.0 * 1000.0 / 8932.0, accuracy: 0.0001)
         XCTAssertEqual(reading.historyMgdl[2], 1010.0 * 1000.0 / 8932.0, accuracy: 0.0001)
+    }
+}
+
+// MARK: - real packets verified against EasyPatch
+//
+// Unlike the synthetic frames above, these four are REAL 669A9141 packets captured on
+// 2026-09-05 between 11:42 and 11:48, alongside the values EasyPatch displayed at the
+// time. They are the only ground truth in this project, so they are asserted precisely.
+
+extension MedtrumPacketDecoderTests {
+
+    private func realPacket(_ hex: String) -> Data {
+        Data(hex.split(separator: " ").compactMap { UInt8($0, radix: 16) })
+    }
+
+    func testRealPacketsMatchEasyPatchToWithinRounding() throws {
+        // packet hex, and the mmol/L EasyPatch showed for that cycle
+        let captures: [(hex: String, easyPatch: Double)] = [
+            ("6F 06 0A 27 1E 15 4D 00 33 01 33 01 32 01 35 01 00 00 0D 04", 16.4),
+            ("6F 06 0A 27 1F 15 4D 00 32 01 33 01 33 01 32 01 00 00 0D 04", 16.4),
+            ("6F 06 0A 27 20 15 4D 00 34 01 32 01 33 01 33 01 00 00 0D 04", 16.5)
+        ]
+
+        for capture in captures {
+            let reading = try expectSuccess(MedtrumPacketDecoder.decode(realPacket(capture.hex)))
+
+            // EasyPatch rounds to one decimal, so agreement to 0.05 mmol/L is as close as
+            // this comparison can get.
+            XCTAssertEqual(reading.mmoll, capture.easyPatch, accuracy: 0.05,
+                           "decoded \(reading.mmoll) mmol/L, EasyPatch showed \(capture.easyPatch)")
+        }
+    }
+
+    func testRealPacketFieldsDecodeAsExpected() throws {
+        let reading = try expectSuccess(
+            MedtrumPacketDecoder.decode(realPacket("6F 06 0A 27 1D 15 4D 00 33 01 32 01 35 01 33 01 00 00 0D 04"))
+        )
+
+        XCTAssertEqual(reading.counter, 0x151D)             // 5405
+        XCTAssertEqual(reading.rawGlucose, 0x0133)          // 307
+        XCTAssertEqual(reading.calibrationFactor, 0x040D)   // 1037
+        XCTAssertEqual(reading.mgdl, 296.05, accuracy: 0.01)
+        XCTAssertEqual(reading.mmoll, 16.43, accuracy: 0.01)
+        XCTAssertEqual(reading.historyRawGlucose, [306, 309, 307])
+
+        // 5405 cycles x 2 minutes, on a 14-day sensor.
+        XCTAssertEqual(reading.sensorAge / 3600, 180.2, accuracy: 0.1)
+    }
+
+    func testThisPumpsMarkerByteIsAccepted() throws {
+        // 0x06, not the 0x02 the xDrip reference documents. Rejecting it is what kept
+        // glucose off the screen even though the packets were arriving.
+        let reading = try expectSuccess(
+            MedtrumPacketDecoder.decode(realPacket("6F 06 0A 27 1D 15 4D 00 33 01 32 01 35 01 33 01 00 00 0D 04"))
+        )
+        XCTAssertGreaterThan(reading.mgdl, 0)
+
+        // The documented marker still works.
+        XCTAssertTrue(MedtrumPacketDecoder.cgmPacketMarkers.contains(0x02))
+        XCTAssertTrue(MedtrumPacketDecoder.cgmPacketMarkers.contains(0x06))
+    }
+
+    func testUnknownMarkerIsStillRejected() {
+        // Widening the marker set must not turn into accepting anything.
+        var packet = [UInt8](realPacket("6F 06 0A 27 1D 15 4D 00 33 01 32 01 35 01 33 01 00 00 0D 04"))
+        packet[1] = 0x09
+
+        guard let error = expectFailure(MedtrumPacketDecoder.decode(Data(packet))) else { return }
+        XCTAssertEqual(error, .invalidPacketMarker(actual: 0x09))
+    }
+
+    func testConsecutiveRealPacketsShowTheHistoryShifting() throws {
+        // Each packet's first history slot should hold the previous packet's current value.
+        // This is what confirms offsets 8 and 10 are a current/previous pair.
+        let first = try expectSuccess(
+            MedtrumPacketDecoder.decode(realPacket("6F 06 0A 27 1E 15 4D 00 33 01 33 01 32 01 35 01 00 00 0D 04"))
+        )
+        let second = try expectSuccess(
+            MedtrumPacketDecoder.decode(realPacket("6F 06 0A 27 1F 15 4D 00 32 01 33 01 33 01 32 01 00 00 0D 04"))
+        )
+
+        XCTAssertEqual(second.counter, first.counter + 1)
+        XCTAssertEqual(second.historyRawGlucose[0], first.rawGlucose)
     }
 }

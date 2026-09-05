@@ -45,6 +45,12 @@ struct MedtrumReading: Equatable {
         mgdl / Self.mgdlPerMmoll
     }
 
+    /// How long the sensor has been running, inferred from the counter, which ticks once
+    /// per 2-minute CGM cycle since sensor start.
+    var sensorAge: TimeInterval {
+        TimeInterval(counter * 2 * 60)
+    }
+
     /// The three previous cycles converted with the same calibration factor.
     /// Not plausibility-filtered — these are shown for diagnostics, never used as a reading.
     var historyMgdl: [Double] {
