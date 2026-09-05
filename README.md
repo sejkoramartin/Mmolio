@@ -174,3 +174,215 @@ Pro první reálný test je potřeba Mac s Xcode a Apple ID (stačí free person
 nastavit `DEVELOPMENT_TEAM`, zapnout automatické podepisování a aplikaci nainstalovat
 na zařízení. Pumpa musí být spárovaná a aktivní v EasyPatch — MedProbe se přidává
 k existujícímu spojení, sám pumpu nepáruje.
+
+---
+
+# TestFlight deployment without a local Mac
+
+Celý řetězec běží na GitHub Actions macOS runneru:
+
+```
+workflow_dispatch → XcodeGen → xcodebuild archive (device, signed)
+                  → xcodebuild -exportArchive → .ipa
+                  → xcrun altool --upload-app → App Store Connect → TestFlight
+```
+
+Workflow: `.github/workflows/testflight.yml`. Spouští se **výhradně ručně**
+(`workflow_dispatch`) — upload je rozhodnutí, ne vedlejší efekt commitu.
+Běžný push spouští jen `ios-build.yml` (simulator build, testy, bezpečnostní audity).
+
+Žádný Fastlane. Vystačíme si s `security`, `xcodebuild`, `xcrun altool` a App Store
+Connect API klíčem, takže v distribučním řetězci není žádná externí závislost, která by
+mohla vidět podepisovací materiál.
+
+## One-time Apple setup
+
+Tyhle kroky **musíš udělat ručně** — automatizovat je by bylo nebezpečnější než je
+jednou proklikat. Všechny jdou z Linuxu, Mac není potřeba.
+
+### 1. Apple Developer Program
+
+Členství v [Apple Developer Program](https://developer.apple.com/programs/) (99 USD/rok).
+Free Personal Team na TestFlight nestačí.
+
+### 2. Registrace Bundle ID
+
+Certificates, Identifiers & Profiles → **Identifiers** → **+** → App IDs → App
+
+- Description: `MedProbe`
+- Bundle ID: **Explicit**, `cz.sejkora.MedProbe`
+- Capabilities: **nezaškrtávej nic**
+
+MedProbe žádnou capability nepotřebuje. Background mode `bluetooth-central` je pouze
+klíč v Info.plist, není to entitlement — aplikace nemá a nesmí mít žádný entitlements
+soubor. Když ti portál nabídne zaškrtnout capabilities, nech je prázdné.
+
+### 3. Distribution certificate (bez Macu, přes OpenSSL)
+
+Apple chce Certificate Signing Request. Na Linuxu:
+
+```bash
+openssl req -new -newkey rsa:2048 -nodes \
+  -keyout distribution.key \
+  -out distribution.csr \
+  -subj "/emailAddress=TVUJ@EMAIL/CN=MedProbe Distribution/C=CZ"
+```
+
+Portál → **Certificates** → **+** → **Apple Distribution** → nahraj `distribution.csr`
+→ stáhni `distribution.cer`.
+
+Převod na `.p12`, který bude runner importovat:
+
+```bash
+openssl x509 -in distribution.cer -inform DER -out distribution.pem -outform PEM
+
+openssl pkcs12 -export -legacy \
+  -inkey distribution.key \
+  -in distribution.pem \
+  -out distribution.p12 \
+  -passout pass:ZVOL_SI_SILNE_HESLO
+```
+
+**`-legacy` tam musí být.** OpenSSL 3 jinak zašifruje `.p12` pomocí PBES2/AES-256, což
+`security import` na runneru nepřečte, a job spadne na importu certifikátu s naprosto
+nevypovídající chybou. S `-legacy` vznikne 3DES/SHA-1 varianta, kterou macOS zvládne.
+
+Heslo, které si zvolíš, jde do secretu `APPLE_DISTRIBUTION_CERT_PASSWORD`.
+
+`distribution.key` si ulož — bez něj nemůžeš certifikát znovu zabalit a musel bys ho
+vydat znovu. Ulož ho mimo repozitář.
+
+### 4. Provisioning profile
+
+Portál → **Profiles** → **+** → Distribution → **App Store Connect**
+
+- App ID: `cz.sejkora.MedProbe`
+- Certificate: ten z kroku 3
+- Name: cokoli, workflow si jméno přečte přímo z profilu
+
+Stáhni `.mobileprovision`.
+
+### 5. App Store Connect app record
+
+[App Store Connect](https://appstoreconnect.apple.com) → **Apps** → **+** → New App
+
+- Platform: **iOS**
+- Name: `MedProbe`
+- Primary language: dle libosti
+- Bundle ID: `cz.sejkora.MedProbe`
+- SKU: např. `medprobe-001`
+
+Bez tohoto záznamu upload skončí chybou o neznámé aplikaci. Repozitář ho nezakládá
+sám — je to jednorázový krok.
+
+### 6. App Store Connect API key
+
+App Store Connect → **Users and Access** → **Integrations** → App Store Connect API
+→ **Team Keys** → **+**
+
+- Name: např. `MedProbe CI`
+- Access: **App Manager**
+
+Stáhni `AuthKey_XXXXXXXXXX.p8` — **jde to jen jednou**. Opiš si **Key ID** a **Issuer ID**.
+
+## GitHub Secrets
+
+Hodnoty zakóduj do base64 jedním řádkem:
+
+```bash
+base64 -w0 distribution.p12         > /tmp/cert.b64
+base64 -w0 MedProbe_AppStore.mobileprovision > /tmp/profile.b64
+base64 -w0 AuthKey_XXXXXXXXXX.p8    > /tmp/key.b64
+```
+
+Šest secretů, přesně tyto názvy:
+
+| Secret | Obsah |
+|---|---|
+| `APPLE_DISTRIBUTION_CERT_P12_BASE64` | base64 `distribution.p12` |
+| `APPLE_DISTRIBUTION_CERT_PASSWORD` | heslo zvolené v kroku 3 |
+| `APPLE_PROVISIONING_PROFILE_BASE64` | base64 `.mobileprovision` |
+| `APP_STORE_CONNECT_KEY_ID` | Key ID, 10 znaků |
+| `APP_STORE_CONNECT_ISSUER_ID` | Issuer ID, UUID |
+| `APP_STORE_CONNECT_API_KEY_P8_BASE64` | base64 `.p8` |
+
+Team ID ani jméno profilu jako secret nepotřebuješ — workflow si obojí přečte přímo
+z provisioning profilu, takže se to nemůže rozejít.
+
+Nastavení přes `gh`:
+
+```bash
+gh secret set APPLE_DISTRIBUTION_CERT_P12_BASE64   < /tmp/cert.b64
+gh secret set APPLE_PROVISIONING_PROFILE_BASE64    < /tmp/profile.b64
+gh secret set APP_STORE_CONNECT_API_KEY_P8_BASE64  < /tmp/key.b64
+gh secret set APPLE_DISTRIBUTION_CERT_PASSWORD     # vyzve interaktivně
+gh secret set APP_STORE_CONNECT_KEY_ID
+gh secret set APP_STORE_CONNECT_ISSUER_ID
+
+shred -u /tmp/cert.b64 /tmp/profile.b64 /tmp/key.b64
+```
+
+Po nastavení už hodnoty z GitHubu nepřečteš zpátky — to je záměr.
+
+## Running the workflow
+
+GitHub → **Actions** → **TestFlight** → **Run workflow**. Nebo:
+
+```bash
+gh workflow run testflight.yml
+gh run watch
+```
+
+Workflow rozlišuje fáze, takže v logu poznáš, kde to případně spadlo:
+
+1. **Preflight** — vypíše jména chybějících secretů, nikdy hodnoty
+2. **ARCHIVE SUCCEEDED** — `.xcarchive` pro zařízení
+3. **EXPORT SUCCEEDED** — podepsaná `.ipa`
+4. **UPLOAD SUCCEEDED** — Apple převzal build
+
+Apple pak build zpracovává asynchronně, typicky pár minut. Workflow na to nečeká.
+
+### Build number
+
+`CFBundleVersion` se plní z `github.run_number` předaného na příkazové řádce
+`xcodebuild archive` jako `CURRENT_PROJECT_VERSION`. To číslo je monotónní a nikdy se
+neopakuje, takže TestFlight build nikdy neodmítne jako duplicitní. `MARKETING_VERSION`
+zůstává `0.1.0` a mění se ručně v `project.yml`.
+
+Aby se hodnota z příkazové řádky vůbec dostala do bundlu, má Info.plist
+`CFBundleVersion` nastavené na `$(CURRENT_PROJECT_VERSION)`, ne na literál. CI si to
+hlídá — dry-run archivuje s `424242` a ověří, že se to číslo objeví v Info.plist.
+
+## Installing MedProbe from TestFlight
+
+1. App Store Connect → MedProbe → **TestFlight** → počkej, až build přejde z *Processing*
+2. Vyplň **Export Compliance**, pokud se zeptá. Aplikace deklaruje
+   `ITSAppUsesNonExemptEncryption = false`, takže by se ptát neměl.
+3. Přidej sebe jako internal testera (Users and Access → tvůj účet → role s přístupem)
+4. Na iPhonu 15 Pro nainstaluj **TestFlight** z App Storu, přihlas se stejným Apple ID
+5. Build se objeví v TestFlightu, instalace jedním klepnutím
+
+Pak už jen: povolit Bluetooth oprávnění při prvním spuštění a mít pumpu aktivní
+a spárovanou v EasyPatch. MedProbe se přidává k existujícímu spojení, sám nepáruje.
+
+## Rotating/revoking credentials
+
+Podepisovací materiál existuje jen po dobu běhu jobu: certifikát se importuje do
+dočasné keychain v `$RUNNER_TEMP` s náhodně vygenerovaným heslem, profil se instaluje
+až v jobu a cleanup krok běží i při selhání (`if: always()`).
+
+Když se něco přesto vyzradí:
+
+- **Certifikát** — Apple Developer → Certificates → revoke. Vydej nový (krok 3),
+  vytvoř nový provisioning profile (starý přestane platit) a přepiš oba secrety.
+- **API key** — App Store Connect → Integrations → Revoke. Vytvoř nový, přepiš
+  `APP_STORE_CONNECT_KEY_ID` a `APP_STORE_CONNECT_API_KEY_P8_BASE64`.
+- **Provisioning profile** — sám o sobě není citlivý (je v každé `.ipa`), ale po
+  revokaci certifikátu ho stejně musíš vydat znovu.
+
+Certifikát platí rok, provisioning profile taky — až workflow jednou spadne na
+podpisu, tohle bude nejspíš důvod.
+
+Kdyby se podepisovací soubor omylem dostal do gitu, CI to zachytí krokem
+*Assert no signing secrets are committed*, ale samotné odstranění commitu nestačí —
+credential je nutné revokovat a vydat znovu.
