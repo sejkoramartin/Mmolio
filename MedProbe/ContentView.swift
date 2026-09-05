@@ -52,11 +52,14 @@ struct ContentView: View {
             } message: {
                 Text("Stored with the exact time you tap Mark, alongside the packets. Never used for decoding.")
             }
-            .alert("Start a new capture?", isPresented: $isConfirmingClear) {
+            .alert("Delete captured records?", isPresented: $isConfirmingClear) {
                 Button("Cancel", role: .cancel) { }
-                Button("Delete and restart", role: .destructive) { recorder.clear() }
+                Button("Delete records", role: .destructive) { recorder.clear() }
             } message: {
-                Text("This deletes the \(recorder.recordCount) records already captured.")
+                // The earlier wording was "Delete and restart", which read as though it
+                // restarted the connection. It never did: this button only touches the
+                // capture file.
+                Text("Deletes the \(recorder.recordCount) records captured so far and starts a new capture file. Does not affect the Bluetooth connection.")
             }
             .sheet(item: $exportFile) { file in
                 ShareSheet(url: file.url)
@@ -254,7 +257,7 @@ struct ContentView: View {
             Button(role: .destructive) {
                 isConfirmingClear = true
             } label: {
-                Label("Clear capture", systemImage: "trash")
+                Label("Delete captured records", systemImage: "trash")
             }
             .disabled(recorder.recordCount == 0)
 
