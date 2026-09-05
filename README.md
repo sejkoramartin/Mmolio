@@ -243,9 +243,14 @@ openssl pkcs12 -export -legacy \
   -passout pass:ZVOL_SI_SILNE_HESLO
 ```
 
-**`-legacy` tam musí být.** OpenSSL 3 jinak zašifruje `.p12` pomocí PBES2/AES-256, což
-`security import` na runneru nepřečte, a job spadne na importu certifikátu s naprosto
-nevypovídající chybou. S `-legacy` vznikne 3DES/SHA-1 varianta, kterou macOS zvládne.
+**K `-legacy`:** OpenSSL 3 bez něj zašifruje `.p12` pomocí PBES2/AES-256, zatímco
+s ním vznikne starší 3DES/SHA-1 varianta. Historicky `security import` na macOS to
+první nepřečetl a job spadl na importu certifikátu s nevypovídající chybou.
+
+Aktuální runner (macOS 26) už zvládne obojí — CI to ověřuje krokem
+*Verify the README's OpenSSL .p12 recipe still holds*, který oba formáty skutečně
+importuje. `-legacy` přesto doporučuji: funguje na obou a nestojí nic navíc.
+Kdyby se to někdy změnilo, CI to nahlásí dřív, než na to narazíš ty.
 
 Heslo, které si zvolíš, jde do secretu `APPLE_DISTRIBUTION_CERT_PASSWORD`.
 
