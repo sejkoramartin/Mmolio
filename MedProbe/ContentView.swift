@@ -7,21 +7,31 @@
 
 import SwiftUI
 import CoreBluetooth
+import UIKit
 
 struct ContentView: View {
 
     @ObservedObject var bluetoothManager: MedtrumBluetoothManager
     @ObservedObject private var log: DiagnosticLog
+    @ObservedObject private var recorder: PacketRecorder
+
+    @State private var isAskingForReading = false
+    @State private var readingInput = ""
+    @State private var exportFile: ExportFile?
+    @State private var actionError: String?
+    @State private var isConfirmingClear = false
 
     init(bluetoothManager: MedtrumBluetoothManager) {
         self.bluetoothManager = bluetoothManager
         self.log = bluetoothManager.log
+        self.recorder = bluetoothManager.recorder
     }
 
     var body: some View {
         NavigationStack {
             List {
                 statusSection
+                captureSection
                 characteristicsSection
                 glucoseSection
                 packetSection
@@ -29,6 +39,93 @@ struct ContentView: View {
             }
             .listStyle(.plain)
             .navigationTitle("MedProbe")
+            .alert("EasyPatch reading", isPresented: $isAskingForReading) {
+                TextField("mmol/L, e.g. 10.6", text: $readingInput)
+                    .keyboardType(.decimalPad)
+                Button("Cancel", role: .cancel) { readingInput = "" }
+                Button("Mark") { markReading() }
+            } message: {
+                Text("Stored with the exact time you tap Mark, alongside the packets. Never used for decoding.")
+            }
+            .alert("Start a new capture?", isPresented: $isConfirmingClear) {
+                Button("Cancel", role: .cancel) { }
+                Button("Delete and restart", role: .destructive) { recorder.clear() }
+            } message: {
+                Text("This deletes the \(recorder.recordCount) records already captured.")
+            }
+            .sheet(item: $exportFile) { file in
+                ShareSheet(url: file.url)
+            }
+        }
+    }
+
+    // MARK: - capture
+
+    /// TEMPORARY DIAGNOSTIC: capture controls for the offline correlation exercise.
+    private var captureSection: some View {
+        Section("Capture") {
+            row("Records", "\(recorder.recordCount)")
+
+            if let error = recorder.storageError {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+
+            Button {
+                readingInput = ""
+                isAskingForReading = true
+            } label: {
+                Label("Mark EasyPatch Reading", systemImage: "drop.fill")
+            }
+
+            Button {
+                export()
+            } label: {
+                Label("Export CSV", systemImage: "square.and.arrow.up")
+            }
+            .disabled(recorder.recordCount == 0)
+
+            if let actionError {
+                Text(actionError)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+
+            Button(role: .destructive) {
+                isConfirmingClear = true
+            } label: {
+                Label("Clear capture", systemImage: "trash")
+            }
+            .disabled(recorder.recordCount == 0)
+
+            if let latest = recorder.recentRecords.first(where: { $0.kind == .groundTruth }) {
+                row("Last marked", "\(latest.hex) mmol/L at \(Self.timeFormatter.string(from: latest.timestamp))")
+            }
+        }
+    }
+
+    private func markReading() {
+        // Accept both decimal separators; the keypad offers whichever the locale uses.
+        let normalised = readingInput.replacingOccurrences(of: ",", with: ".")
+        guard let value = Double(normalised), value > 0 else {
+            actionError = "Could not read '\(readingInput)' as a number"
+            readingInput = ""
+            return
+        }
+
+        recorder.recordGroundTruth(mmoll: value)
+        log.info("EasyPatch reading marked: \(String(format: "%.1f", value)) mmol/L")
+        readingInput = ""
+        actionError = nil
+    }
+
+    private func export() {
+        do {
+            exportFile = ExportFile(url: try recorder.exportCSV())
+            actionError = nil
+        } catch {
+            actionError = error.localizedDescription
         }
     }
 
@@ -195,4 +292,24 @@ struct ContentView: View {
         formatter.dateFormat = "HH:mm:ss"
         return formatter
     }()
+}
+
+/// Wraps the system share sheet so a generated CSV can be handed off to Files, Mail,
+/// AirDrop or anything else the user prefers.
+struct ShareSheet: UIViewControllerRepresentable {
+
+    let url: URL
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: [url], applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
+}
+
+/// `sheet(item:)` needs an Identifiable payload, and conforming URL itself would be a
+/// retroactive conformance on a Foundation type — a wrapper keeps that out of the app.
+struct ExportFile: Identifiable {
+    let id = UUID()
+    let url: URL
 }

@@ -391,3 +391,53 @@ podpisu, tohle bude nejspíš důvod.
 Kdyby se podepisovací soubor omylem dostal do gitu, CI to zachytí krokem
 *Assert no signing secrets are committed*, ale samotné odstranění commitu nestačí —
 credential je nutné revokovat a vydat znovu.
+
+---
+
+# Capture workflow (diagnostic builds)
+
+Build 0.2.0 showed that CGM notifications do **not** arrive on `669A9141` at all,
+while two other characteristics stream continuously. Build 0.3.0 therefore stops
+guessing and records everything for offline analysis.
+
+## Recording a session
+
+1. Otevři MedProbe, ověř, že **Characteristics** ukazuje rostoucí čísla u `669A9101`
+   a `669A9120`
+2. Nech telefon nahrávat 15–30 minut. Záznam přežije uspání i přepnutí do pozadí —
+   zapisuje se průběžně na disk, ne až na konci.
+3. Kdykoli se v EasyPatch objeví nová glykemie, klepni na **Mark EasyPatch Reading**
+   a zadej ji (např. `10.6`). Uloží se s přesným časem klepnutí.
+   Čím víc značek, tím lépe — ideálně každý CGM cyklus.
+4. Na konci **Export CSV** a pošli soubor sobě (Files, mail, AirDrop).
+
+## Formát exportu
+
+```
+timestamp,characteristic,length,hex
+2026-09-05T12:50:51.284Z,669A9101-…,20,4F 93 3D 01 00 00 A0 …
+2026-09-05T12:51:30.117Z,EASYPATCH_MMOL_L,0,10.6
+```
+
+Timestamp je ISO 8601 s milisekundami — během jedné sekundy chodí víc paketů a na
+jejich pořadí záleží.
+
+Ručně označené hodnoty z EasyPatch jsou ve stejném souboru, rozlišené hodnotou
+`EASYPATCH_MMOL_L` ve sloupci `characteristic`. Drží se schema o čtyřech sloupcích
+a offline se dají triviálně oddělit. **Aplikace je nikdy nečte zpět** — neovlivňují
+dekódování, slouží výhradně ke korelaci mimo telefon.
+
+Data se ukládají do `medprobe-capture.jsonl` v Documents aplikace, řádek po řádku.
+Když se aplikace ukončí, přijdeš nanejvýš o poslední rozepsaný řádek, ne o celý záznam.
+**Clear capture** začne nový sběr.
+
+## Co se ví o rámcích
+
+Zatím jen struktura, žádný význam:
+
+- `669A9101` — `write-acked,indicate`, nese dva druhy rámců: dvojice `20 22 XX 01/02`
+  (20 a 18 bajtů) a sekvence `4F 93 XX 01..05` (20 bajtů)
+- `669A9120` — `notify`, 13bajtové rámce, z toho 11 bajtů konstantních
+- `669A9141` — `notify`, subscribe uspěje, **nikdy nic nepřijde**
+
+Sémantika bajtů zatím přiřazená není a přiřazovat se nebude, dokud ji nepodloží data.

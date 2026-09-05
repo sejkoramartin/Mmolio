@@ -76,6 +76,9 @@ final class MedtrumBluetoothManager: NSObject, ObservableObject {
     /// Event log rendered at the bottom of the diagnostic screen.
     let log = DiagnosticLog(category: "ble")
 
+    /// Persistent capture of every notification, for offline analysis.
+    let recorder = PacketRecorder()
+
     // MARK: - private state
 
     private var centralManager: CBCentralManager?
@@ -416,6 +419,10 @@ extension MedtrumBluetoothManager: CBPeripheralDelegate {
         // which is exactly the failure we are chasing.
         let hex = MedtrumPacketDecoder.hexString(value)
         packetsReceived += 1
+
+        // Persist before anything else can filter or interpret the packet.
+        recorder.record(characteristic: uuid, data: value)
+
         update(uuid: uuid, service: serviceUUID) {
             $0.packetCount += 1
             $0.lastPacketHex = hex

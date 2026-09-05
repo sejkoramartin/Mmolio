@@ -35,7 +35,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: cz.sejkora.MedProbe
         PRODUCT_NAME: MedProbe
-        MARKETING_VERSION: "0.2.0"
+        MARKETING_VERSION: "0.3.0"
         # Overridden on the xcodebuild command line by the TestFlight workflow, which
         # passes the GitHub run number so every uploaded build is unique.
         CURRENT_PROJECT_VERSION: "1"
