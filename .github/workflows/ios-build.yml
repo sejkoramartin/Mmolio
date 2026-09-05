@@ -110,8 +110,21 @@ jobs:
           fi
 
           # An App Store Connect key is unmistakable even if the file was renamed.
-          if git grep -lE 'BEGIN (RSA |EC |OPENSSH |)PRIVATE KEY' -- . ; then
+          #
+          # git grep exits 1 for "no match" and 128 for "bad pattern", and both are falsy,
+          # so the status has to be inspected explicitly — otherwise a broken pattern reads
+          # as a clean repository. That is exactly what happened with an earlier version of
+          # this check, which contained an empty alternation and never actually ran.
+          set +e
+          git grep -lE 'BEGIN ([A-Z0-9]+ )?PRIVATE KEY' -- .
+          GREP_STATUS=$?
+          set -e
+
+          if [ "$GREP_STATUS" -eq 0 ]; then
             echo "::error::A private key block is committed to the repository. Remove it and rotate the credential."
+            exit 1
+          elif [ "$GREP_STATUS" -ne 1 ]; then
+            echo "::error::The private key scan itself failed (git grep exit $GREP_STATUS); refusing to report success."
             exit 1
           fi
 
