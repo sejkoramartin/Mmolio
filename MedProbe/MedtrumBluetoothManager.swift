@@ -323,7 +323,20 @@ final class MedtrumBluetoothManager: NSObject, ObservableObject {
         }
 
         let age = streamTracker.packetAge(now: Date()).map { Int($0 / 60) }
-        log.error("No valid CGM packet for \(Int(CGMStreamTracker.inactivityTimeout / 60))+ min (last: \(age.map { "\($0) min ago" } ?? "never")). Recycling our connection.")
+        let ageText = age.map { "\($0) min ago" } ?? "never"
+
+        // Recycling only helps if the pump is transmitting and we are failing to receive.
+        // Across three captures, 669A9141 has only ever delivered while the 9120 CGM state
+        // byte reads 0x03, and that window lasts about five minutes — two CGM cycles — at a
+        // time. Outside it there is nothing to receive, so dropping and rebuilding the link
+        // would burn battery and disturb a connection shared with EasyPatch for nothing.
+        if let state = cgmStateByte, state != 0x03 {
+            log.warning("No CGM packet for \(Int(CGMStreamTracker.inactivityTimeout / 60))+ min (last: \(ageText)), but CGM state is 0x\(String(format: "%02X", state)) — pump is not transmitting. Not recycling.", .cgm)
+            armCGMWatchdog()
+            return
+        }
+
+        log.error("No valid CGM packet for \(Int(CGMStreamTracker.inactivityTimeout / 60))+ min (last: \(ageText)) while CGM state allows transmission. Recycling our connection.", .cgm)
 
         recycleConnection(reason: .cgmStreamStalled)
     }
@@ -593,14 +606,23 @@ extension MedtrumBluetoothManager: CBPeripheralDelegate {
                 continue
             }
 
-            // Production mode listens to the glucose characteristic alone, keeping the BLE
-            // footprint to what MedProbe actually needs. Diagnostic mode subscribes to
-            // everything that can push data, which is how 9101 and 9120 were mapped in the
-            // first place. Subscribing is read-only either way: it enables a notification,
-            // it does not send the pump a command.
+            // Production mode listens to the glucose characteristic and the status stream.
+            //
+            // 669A9120 is not optional: its CGM state byte is currently the only way to
+            // tell "the pump is not sending" from "we lost the stream". An earlier version
+            // subscribed to 9141 alone, which left the app unable to distinguish the two —
+            // it simply looked dead whenever the pump was between transmit windows.
+            //
+            // Diagnostic mode adds 9101 as well, which is how the protocol was mapped.
+            // Subscribing is read-only either way: it enables a notification, it does not
+            // send the pump a command.
             let diagnosticMode = MedProbeConstants.isDiagnosticModeEnabled
-            if !diagnosticMode && characteristic.uuid != Self.cgmNotifyCharacteristicUUID {
-                log.info("Not subscribing to \(entry.shortUUID): production mode listens to CGM only")
+            let productionCharacteristics: Set<CBUUID> = [
+                Self.cgmNotifyCharacteristicUUID,
+                Self.notificationCharacteristicUUID
+            ]
+            if !diagnosticMode && !productionCharacteristics.contains(characteristic.uuid) {
+                log.info("Not subscribing to \(entry.shortUUID): not needed outside diagnostic mode", .ble)
                 continue
             }
 
