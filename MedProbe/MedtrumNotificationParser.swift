@@ -28,7 +28,17 @@ struct NotificationField: Equatable {
 
     /// Value decoded per AndroidAPS, when that project decodes this field at all.
     /// Nil where AAPS itself does not interpret the bytes — notably the CGM field.
+    ///
+    /// Present so the parser can be verified — the bolus/reservoir cross-check is what
+    /// proves the field offsets are right — but withheld from the UI and the event log
+    /// unless diagnostic mode is on. See `isTherapyData`.
     let interpretation: String?
+
+    /// True for fields describing insulin delivery or pump alarms.
+    ///
+    /// MedProbe is a CGM reader. It has to know how wide these fields are, or the CGM
+    /// field would land at the wrong offset, but it has no business displaying them.
+    let isTherapyData: Bool
 
     var hex: String {
         bytes.map { String(format: "%02X", $0) }.joined(separator: " ")
@@ -50,6 +60,17 @@ struct MedtrumNotification: Equatable {
     /// This is the field MedProbe actually cares about; its meaning is not established.
     var cgmFieldBytes: [UInt8]? {
         fields.first { $0.mask == MedtrumNotificationParser.maskUnusedCGM }?.bytes
+    }
+
+    /// Fields safe to show without diagnostic mode: everything that is not about therapy.
+    var nonTherapyFields: [NotificationField] {
+        fields.filter { !$0.isTherapyData }
+    }
+
+    /// How many therapy fields were parsed but withheld, so the UI can say so honestly
+    /// rather than pretending the packet was smaller than it was.
+    var withheldTherapyFieldCount: Int {
+        fields.filter { $0.isTherapyData }.count
     }
 }
 
@@ -87,23 +108,25 @@ enum MedtrumNotificationParser {
     /// Mask, field name and byte width, in the order AndroidAPS lays them out.
     /// Order matters: fields are concatenated in this sequence, so a wrong width here
     /// silently shifts every field after it.
-    static let fieldTable: [(mask: UInt16, name: String, size: Int)] = [
-        (maskSuspend, "suspend", 4),
-        (maskNormalBolus, "normalBolus", 3),
-        (maskExtendedBolus, "extendedBolus", 3),
-        (maskBasal, "basal", 12),
-        (maskSetup, "setup", 1),
-        (maskReservoir, "reservoir", 2),
-        (maskStartTime, "startTime", 4),
-        (maskBattery, "battery", 3),
-        (maskStorage, "storage", 4),
-        (maskAlarm, "alarm", 4),
-        (maskAge, "age", 4),
-        (maskMagnetoPlace, "magnetoPlace", 2),
-        (maskUnusedCGM, "CGM (undecoded by AAPS)", 5),
-        (maskUnusedCommandConfirm, "commandConfirm", 2),
-        (maskUnusedAutoStatus, "autoStatus", 2),
-        (maskUnusedLegacy, "legacy", 2)
+    /// `therapy` marks fields about insulin delivery or alarms. Those are parsed for their
+    /// width and for the offset arithmetic, then kept off screen and out of the log.
+    static let fieldTable: [(mask: UInt16, name: String, size: Int, therapy: Bool)] = [
+        (maskSuspend, "suspend", 4, true),
+        (maskNormalBolus, "normalBolus", 3, true),
+        (maskExtendedBolus, "extendedBolus", 3, true),
+        (maskBasal, "basal", 12, true),
+        (maskSetup, "setup", 1, false),
+        (maskReservoir, "reservoir", 2, true),
+        (maskStartTime, "startTime", 4, false),
+        (maskBattery, "battery", 3, false),
+        (maskStorage, "storage", 4, false),
+        (maskAlarm, "alarm", 4, true),
+        (maskAge, "age", 4, false),
+        (maskMagnetoPlace, "magnetoPlace", 2, false),
+        (maskUnusedCGM, "CGM (undecoded by AAPS)", 5, false),
+        (maskUnusedCommandConfirm, "commandConfirm", 2, false),
+        (maskUnusedAutoStatus, "autoStatus", 2, false),
+        (maskUnusedLegacy, "legacy", 2, false)
     ]
 
     private static let fieldMaskSize = 2
@@ -136,7 +159,8 @@ enum MedtrumNotificationParser {
                     mask: entry.mask,
                     name: entry.name,
                     bytes: slice,
-                    interpretation: interpret(mask: entry.mask, bytes: slice)
+                    interpretation: interpret(mask: entry.mask, bytes: slice),
+                    isTherapyData: entry.therapy
                 )
             )
             offset += entry.size

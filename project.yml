@@ -35,7 +35,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: cz.sejkora.MedProbe
         PRODUCT_NAME: MedProbe
-        MARKETING_VERSION: "0.4.0"
+        MARKETING_VERSION: "0.4.1"
         # Overridden on the xcodebuild command line by the TestFlight workflow, which
         # passes the GitHub run number so every uploaded build is unique.
         CURRENT_PROJECT_VERSION: "1"
@@ -63,6 +63,11 @@ targets:
         # Prepared for later background operation; first-stage testing is foreground only.
         UIBackgroundModes:
           - bluetooth-central
+        # Expose the capture file in Files.app, so a recording can be retrieved even if
+        # the export button is unreachable — e.g. after a crash mid-session. These only
+        # surface the app's own Documents folder to its owner; they grant no new access.
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
 
   MedProbeTests:
     type: bundle.unit-test

@@ -15,6 +15,9 @@ struct ContentView: View {
     @ObservedObject private var log: DiagnosticLog
     @ObservedObject private var recorder: PacketRecorder
 
+    /// Off by default: therapy values stay hidden unless deliberately requested.
+    @AppStorage(MedProbeConstants.diagnosticModeKey) private var diagnosticMode = false
+
     @State private var isAskingForReading = false
     @State private var readingInput = ""
     @State private var exportFile: ExportFile?
@@ -70,7 +73,33 @@ struct ContentView: View {
                 row("State", String(format: "0x%02X", notification.stateRaw))
                 row("Field mask", String(format: "0x%04X", notification.fieldMask))
 
-                ForEach(notification.fields, id: \.mask) { field in
+                // The CGM field is the point of the exercise, so it leads.
+                if let cgm = notification.cgmFieldBytes {
+                    let hex = cgm.map { String(format: "%02X", $0) }.joined(separator: " ")
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("CGM field — meaning unknown")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.orange)
+                        Text(hex)
+                            .font(.system(.body, design: .monospaced))
+                            .textSelection(.enabled)
+                        Text("AndroidAPS reserves these 5 bytes and does not decode them.")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 2)
+                }
+
+                let visibleFields = diagnosticMode ? notification.fields : notification.nonTherapyFields
+                let withheld = notification.withheldTherapyFieldCount
+
+                if !diagnosticMode && withheld > 0 {
+                    Text("\(withheld) therapy field(s) parsed and hidden")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+
+                ForEach(visibleFields, id: \.mask) { field in
                     VStack(alignment: .leading, spacing: 2) {
                         HStack {
                             Text(field.name)
@@ -87,21 +116,6 @@ struct ContentView: View {
                     .padding(.vertical, 1)
                 }
 
-                if let cgm = bluetoothManager.lastNotification?.cgmFieldBytes {
-                    let hex = cgm.map { String(format: "%02X", $0) }.joined(separator: " ")
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("CGM field — meaning unknown")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.orange)
-                        Text(hex)
-                            .font(.system(.caption, design: .monospaced))
-                            .textSelection(.enabled)
-                        Text("AndroidAPS reserves these 5 bytes and does not decode them.")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.vertical, 2)
-                }
             } else {
                 Text("No 669A9120 notification parsed yet")
                     .foregroundStyle(.secondary)
@@ -135,6 +149,15 @@ struct ContentView: View {
     private var captureSection: some View {
         Section("Capture") {
             row("Records", "\(recorder.recordCount)")
+
+            Toggle(isOn: $diagnosticMode) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Diagnostic mode")
+                    Text("Also show insulin delivery and alarm fields. Off by default — MedProbe is a CGM reader.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
 
             if let error = recorder.storageError {
                 Text(error)

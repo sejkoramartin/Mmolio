@@ -477,7 +477,12 @@ extension MedtrumBluetoothManager: CBPeripheralDelegate {
         case .success(let notification):
             lastNotification = notification
 
-            let summary = notification.fields
+            // Therapy fields are withheld from the standard log. The count is still
+            // reported, so the log never implies the packet carried less than it did.
+            let diagnosticMode = MedProbeConstants.isDiagnosticModeEnabled
+            let visible = diagnosticMode ? notification.fields : notification.nonTherapyFields
+
+            var summary = visible
                 .map { field -> String in
                     if let interpretation = field.interpretation {
                         return "\(field.name): \(interpretation)"
@@ -485,6 +490,13 @@ extension MedtrumBluetoothManager: CBPeripheralDelegate {
                     return "\(field.name)=\(field.hex)"
                 }
                 .joined(separator: ", ")
+
+            let withheld = notification.withheldTherapyFieldCount
+            if !diagnosticMode && withheld > 0 {
+                summary += summary.isEmpty ? "" : ", "
+                summary += "\(withheld) therapy field(s) withheld"
+            }
+
             log.info(String(format: "9120 state=0x%02X mask=0x%04X %@",
                             notification.stateRaw, notification.fieldMask, summary))
 

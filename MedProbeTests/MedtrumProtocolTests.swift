@@ -282,3 +282,54 @@ final class MedtrumProtocolTests: XCTestCase {
         }
     }
 }
+
+// MARK: - therapy data is parsed but withheld
+
+extension MedtrumProtocolTests {
+
+    func testTherapyFieldsAreMarkedAndExcludedFromTheVisibleSet() throws {
+        // Real captured frame: bolus + reservoir + CGM.
+        let notification = try parse("20 22 10 00 58 00 45 07 02 88 01 46 0F")
+
+        let bolus = field(notification, MedtrumNotificationParser.maskNormalBolus)
+        let reservoir = field(notification, MedtrumNotificationParser.maskReservoir)
+        let cgm = field(notification, MedtrumNotificationParser.maskUnusedCGM)
+
+        XCTAssertEqual(bolus?.isTherapyData, true)
+        XCTAssertEqual(reservoir?.isTherapyData, true)
+        XCTAssertEqual(cgm?.isTherapyData, false, "the CGM field is the one thing we are here for")
+
+        // What the normal UI and log are allowed to see.
+        XCTAssertEqual(notification.nonTherapyFields.map(\.mask), [MedtrumNotificationParser.maskUnusedCGM])
+        XCTAssertEqual(notification.withheldTherapyFieldCount, 2)
+    }
+
+    func testTherapyValuesAreStillParsedInternally() throws {
+        // Hiding them must not mean not computing them: the bolus/reservoir cross-check is
+        // how we know the CGM field is at the right offset.
+        let notification = try parse("20 22 10 00 58 00 45 07 02 88 01 46 0F")
+
+        XCTAssertEqual(field(notification, MedtrumNotificationParser.maskNormalBolus)?.interpretation,
+                       "delivered 4.40 U, completed no")
+        XCTAssertEqual(field(notification, MedtrumNotificationParser.maskReservoir)?.interpretation,
+                       "93.05 U")
+    }
+
+    func testEveryFieldIsClassifiedExactlyOnce() {
+        // A field missing from the table would shift every field after it, including CGM.
+        let masks = MedtrumNotificationParser.fieldTable.map(\.mask)
+        XCTAssertEqual(Set(masks).count, masks.count, "duplicate mask in the field table")
+        XCTAssertEqual(masks.count, 16, "the field mask is 16 bits; every bit needs a width")
+
+        // Insulin delivery and alarms are therapy; device housekeeping and CGM are not.
+        let therapyMasks = Set(MedtrumNotificationParser.fieldTable.filter(\.therapy).map(\.mask))
+        XCTAssertEqual(therapyMasks, [
+            MedtrumNotificationParser.maskSuspend,
+            MedtrumNotificationParser.maskNormalBolus,
+            MedtrumNotificationParser.maskExtendedBolus,
+            MedtrumNotificationParser.maskBasal,
+            MedtrumNotificationParser.maskReservoir,
+            MedtrumNotificationParser.maskAlarm
+        ])
+    }
+}

@@ -50,8 +50,9 @@ final class PacketRecorder: ObservableObject {
         return decoder
     }()
 
-    /// Capture file, in Documents so it is also reachable over iTunes/Finder file sharing
-    /// if the share sheet ever proves awkward.
+    /// Capture file, in Documents. With UIFileSharingEnabled set, this is also visible in
+    /// Files.app under On My iPhone → MedProbe, so a session can be retrieved without the
+    /// export button — which matters if the app is killed mid-recording.
     var captureURL: URL {
         let documents = fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
         return documents.appendingPathComponent("medprobe-capture.jsonl")

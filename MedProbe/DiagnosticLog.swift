@@ -69,5 +69,19 @@ final class DiagnosticLog: ObservableObject {
 
 /// App-wide constants that are not part of the Medtrum protocol.
 enum MedProbeConstants {
+
     static let logSubsystem = "cz.sejkora.MedProbe"
+
+    /// UserDefaults key behind the diagnostic-mode switch.
+    ///
+    /// MedProbe is a CGM reader. Insulin delivery and alarm values are parsed — the field
+    /// widths are needed to find the CGM field, and the bolus/reservoir cross-check is how
+    /// we know the offsets are right — but they stay off screen and out of the event log
+    /// unless this is deliberately switched on.
+    static let diagnosticModeKey = "diagnosticMode"
+
+    /// Whether therapy values may currently be displayed and logged. Off by default.
+    static var isDiagnosticModeEnabled: Bool {
+        UserDefaults.standard.bool(forKey: diagnosticModeKey)
+    }
 }
