@@ -131,10 +131,9 @@ final class PacketRecordTests: XCTestCase {
     // MARK: - persistence round trip
 
     func testRecordSurvivesJSONRoundTrip() throws {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        // The same encoder and decoder the recorder uses, so this exercises the real path.
+        let encoder = PacketRecord.makeEncoder()
+        let decoder = PacketRecord.makeDecoder()
 
         // A timestamp with non-zero milliseconds on purpose. The original version of this
         // test used a whole number of seconds, so it passed while the encoder was quietly

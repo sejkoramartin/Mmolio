@@ -38,34 +38,8 @@ final class PacketRecorder: ObservableObject {
     private let fileManager = FileManager.default
     private var fileHandle: FileHandle?
 
-    // JSONEncoder's built-in .iso8601 strategy writes whole seconds only — it does not
-    // include fractional seconds. Using it silently truncated every recorded timestamp to
-    // the second, which defeats the point of recording milliseconds in the first place:
-    // several packets routinely land inside one second and their order matters.
-    private let encoder: JSONEncoder = {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .custom { date, encoder in
-            var container = encoder.singleValueContainer()
-            try container.encode(PacketRecord.timestampFormatter.string(from: date))
-        }
-        return encoder
-    }()
-
-    private let decoder: JSONDecoder = {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .custom { decoder in
-            let container = try decoder.singleValueContainer()
-            let string = try container.decode(String.self)
-            guard let date = PacketRecord.parseTimestamp(string) else {
-                throw DecodingError.dataCorruptedError(
-                    in: container,
-                    debugDescription: "Unrecognised timestamp: \(string)"
-                )
-            }
-            return date
-        }
-        return decoder
-    }()
+    private let encoder = PacketRecord.makeEncoder()
+    private let decoder = PacketRecord.makeDecoder()
 
     /// Capture file, in Documents. With UIFileSharingEnabled set, this is also visible in
     /// Files.app under On My iPhone → MedProbe, so a session can be retrieved without the

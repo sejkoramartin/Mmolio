@@ -121,6 +121,44 @@ struct PacketRecord: Codable, Equatable, Identifiable {
         timestampFormatter.date(from: string) ?? legacyTimestampFormatter.date(from: string)
     }
 
+    // MARK: - persistence
+    //
+    // The encoder and decoder live here rather than in PacketRecorder so that tests
+    // exercise the same configuration the recorder uses. An earlier version of the
+    // round-trip test built its own JSONEncoder with the stock .iso8601 strategy, so it
+    // was testing Foundation's default rather than what the app actually writes — and it
+    // kept passing while real captures lost their milliseconds.
+
+    /// Encoder used for the capture file.
+    ///
+    /// JSONEncoder's built-in `.iso8601` strategy writes whole seconds only; it does not
+    /// include fractional seconds. Using it truncated every stored timestamp.
+    static func makeEncoder() -> JSONEncoder {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .custom { date, encoder in
+            var container = encoder.singleValueContainer()
+            try container.encode(timestampFormatter.string(from: date))
+        }
+        return encoder
+    }
+
+    /// Decoder for the capture file, tolerant of timestamps written before that was fixed.
+    static func makeDecoder() -> JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let string = try container.decode(String.self)
+            guard let date = parseTimestamp(string) else {
+                throw DecodingError.dataCorruptedError(
+                    in: container,
+                    debugDescription: "Unrecognised timestamp: \(string)"
+                )
+            }
+            return date
+        }
+        return decoder
+    }
+
     var csvRow: String {
         [
             Self.timestampFormatter.string(from: timestamp),
