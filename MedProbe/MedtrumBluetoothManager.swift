@@ -478,7 +478,12 @@ extension MedtrumBluetoothManager: CBPeripheralDelegate {
             lastNotification = notification
 
             let summary = notification.fields
-                .map { $0.interpretation.map { text in "\($0.name): \(text)" } ?? "\($0.name)=\($0.hex)" }
+                .map { field -> String in
+                    if let interpretation = field.interpretation {
+                        return "\(field.name): \(interpretation)"
+                    }
+                    return "\(field.name)=\(field.hex)"
+                }
                 .joined(separator: ", ")
             log.info(String(format: "9120 state=0x%02X mask=0x%04X %@",
                             notification.stateRaw, notification.fieldMask, summary))
