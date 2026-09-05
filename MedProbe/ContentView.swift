@@ -230,6 +230,11 @@ struct ContentView: View {
             row("Pump", bluetoothManager.pumpName ?? "—")
             row("State", bluetoothManager.connectionState.rawValue)
             row("Packets", "\(bluetoothManager.packetsReceived)")
+
+            if let units = bluetoothManager.reservoirUnits {
+                let age = bluetoothManager.reservoirUpdatedAt.map { Self.timeFormatter.string(from: $0) } ?? "—"
+                row("Reservoir", String(format: "%.2f U  (%@)", units, age))
+            }
         }
     }
 

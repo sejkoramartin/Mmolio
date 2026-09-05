@@ -67,6 +67,17 @@ struct MedtrumNotification: Equatable {
         fields.filter { !$0.isTherapyData }
     }
 
+    /// Remaining insulin in the reservoir, in units, when the pump reported it.
+    ///
+    /// Device status rather than therapy, and verified against EasyPatch on the device.
+    /// Decoded per AndroidAPS: uint16 little-endian, times 0.05.
+    var reservoirUnits: Double? {
+        guard let field = fields.first(where: { $0.mask == MedtrumNotificationParser.maskReservoir }),
+              field.bytes.count == 2 else { return nil }
+        let raw = UInt16(field.bytes[0]) | (UInt16(field.bytes[1]) << 8)
+        return Double(raw) * 0.05
+    }
+
     /// How many therapy fields were parsed but withheld, so the UI can say so honestly
     /// rather than pretending the packet was smaller than it was.
     var withheldTherapyFieldCount: Int {
@@ -108,15 +119,20 @@ enum MedtrumNotificationParser {
     /// Mask, field name and byte width, in the order AndroidAPS lays them out.
     /// Order matters: fields are concatenated in this sequence, so a wrong width here
     /// silently shifts every field after it.
-    /// `therapy` marks fields about insulin delivery or alarms. Those are parsed for their
-    /// width and for the offset arithmetic, then kept off screen and out of the log.
+    /// `therapy` marks fields about insulin *delivery* — doses given, basal programme,
+    /// suspension, alarms. Those are parsed for their width and offset arithmetic, then
+    /// kept off screen and out of the log.
+    ///
+    /// Reservoir is deliberately not in that group. How much insulin is left is device
+    /// status, the same kind of thing as battery level, not a record of therapy delivered.
+    /// It was verified against EasyPatch on the device and is useful to show.
     static let fieldTable: [(mask: UInt16, name: String, size: Int, therapy: Bool)] = [
         (maskSuspend, "suspend", 4, true),
         (maskNormalBolus, "normalBolus", 3, true),
         (maskExtendedBolus, "extendedBolus", 3, true),
         (maskBasal, "basal", 12, true),
         (maskSetup, "setup", 1, false),
-        (maskReservoir, "reservoir", 2, true),
+        (maskReservoir, "reservoir", 2, false),
         (maskStartTime, "startTime", 4, false),
         (maskBattery, "battery", 3, false),
         (maskStorage, "storage", 4, false),

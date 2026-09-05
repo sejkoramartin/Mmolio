@@ -87,6 +87,12 @@ final class MedtrumBluetoothManager: NSObject, ObservableObject {
     /// Most recent parsed 669A9120 notification.
     @Published private(set) var lastNotification: MedtrumNotification?
 
+    /// Last reported reservoir level in units, and when it arrived. Kept separately because
+    /// notifications do not carry this field every time, so the latest known value should
+    /// survive the ones that omit it.
+    @Published private(set) var reservoirUnits: Double?
+    @Published private(set) var reservoirUpdatedAt: Date?
+
     /// Most recent fully reassembled 669A9101 message.
     @Published private(set) var lastAssembledFrame: AssembledFrame?
 
@@ -476,6 +482,11 @@ extension MedtrumBluetoothManager: CBPeripheralDelegate {
         switch MedtrumNotificationParser.parse(data) {
         case .success(let notification):
             lastNotification = notification
+
+            if let units = notification.reservoirUnits {
+                reservoirUnits = units
+                reservoirUpdatedAt = Date()
+            }
 
             // Therapy fields are withheld from the standard log. The count is still
             // reported, so the log never implies the packet carried less than it did.

@@ -296,12 +296,13 @@ extension MedtrumProtocolTests {
         let cgm = field(notification, MedtrumNotificationParser.maskUnusedCGM)
 
         XCTAssertEqual(bolus?.isTherapyData, true)
-        XCTAssertEqual(reservoir?.isTherapyData, true)
         XCTAssertEqual(cgm?.isTherapyData, false, "the CGM field is the one thing we are here for")
+        XCTAssertEqual(reservoir?.isTherapyData, false, "reservoir is device status, and is shown")
 
         // What the normal UI and log are allowed to see.
-        XCTAssertEqual(notification.nonTherapyFields.map(\.mask), [MedtrumNotificationParser.maskUnusedCGM])
-        XCTAssertEqual(notification.withheldTherapyFieldCount, 2)
+        XCTAssertEqual(notification.nonTherapyFields.map(\.mask),
+                       [MedtrumNotificationParser.maskReservoir, MedtrumNotificationParser.maskUnusedCGM])
+        XCTAssertEqual(notification.withheldTherapyFieldCount, 1)
     }
 
     func testTherapyValuesAreStillParsedInternally() throws {
@@ -328,8 +329,7 @@ extension MedtrumProtocolTests {
             MedtrumNotificationParser.maskNormalBolus,
             MedtrumNotificationParser.maskExtendedBolus,
             MedtrumNotificationParser.maskBasal,
-            MedtrumNotificationParser.maskReservoir,
             MedtrumNotificationParser.maskAlarm
-        ])
+        ], "reservoir is device status, not delivery, and stays visible")
     }
 }
