@@ -6,6 +6,9 @@ na jediné diagnostické obrazovce.
 
 Etapa 1 = diagnostický prototyp. Nic víc.
 
+> **Aktuální stav, otevřené otázky a kudy dál najdeš v [STATUS.md](STATUS.md).**
+> Dekodér je ověřený proti EasyPatch; nedořešená zůstává spolehlivost doručování.
+
 ---
 
 ## ⚠️ Co aplikace NEDĚLÁ
