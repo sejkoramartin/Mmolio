@@ -130,6 +130,10 @@ final class MedtrumBluetoothManager: NSObject, ObservableObject {
     @Published private(set) var lastReconnectReason: ReconnectReason?
     @Published private(set) var lastReconnectAt: Date?
 
+    /// Identifies one run of the process, so log lines from different launches cannot be
+    /// mistaken for each other when reading an exported capture after the fact.
+    static let launchID = String(UUID().uuidString.prefix(4))
+
     /// Short identity for this manager instance. If a second one ever came into existence
     /// — the lifecycle bug worth ruling out — the log would show two different values.
     let instanceID = String(UUID().uuidString.prefix(4))
@@ -184,7 +188,7 @@ final class MedtrumBluetoothManager: NSObject, ObservableObject {
     func start() {
         guard centralManager == nil else { return }
 
-        log.info("Manager \(instanceID): starting CBCentralManager (restore id \(Self.restoreIdentifier))", .ble)
+        log.info("launch=\(Self.launchID) manager=\(instanceID) mode=\(ListeningMode.current.rawValue): starting CBCentralManager", .ble)
 
         centralManager = CBCentralManager(
             delegate: self,
@@ -616,13 +620,13 @@ extension MedtrumBluetoothManager: CBPeripheralDelegate {
             // Diagnostic mode adds 9101 as well, which is how the protocol was mapped.
             // Subscribing is read-only either way: it enables a notification, it does not
             // send the pump a command.
-            let diagnosticMode = MedProbeConstants.isDiagnosticModeEnabled
-            let productionCharacteristics: Set<CBUUID> = [
-                Self.cgmNotifyCharacteristicUUID,
-                Self.notificationCharacteristicUUID
-            ]
-            if !diagnosticMode && !productionCharacteristics.contains(characteristic.uuid) {
-                log.info("Not subscribing to \(entry.shortUUID): not needed outside diagnostic mode", .ble)
+            let mode = ListeningMode.current
+            let allowed = mode.subscribedCharacteristics(
+                cgm: Self.cgmNotifyCharacteristicUUID.uuidString,
+                status: Self.notificationCharacteristicUUID.uuidString
+            )
+            if let allowed, !allowed.contains(characteristic.uuid.uuidString) {
+                log.info("Not subscribing to \(entry.shortUUID): \(mode.title)", .ble)
                 continue
             }
 

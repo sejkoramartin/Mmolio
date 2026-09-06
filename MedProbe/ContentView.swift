@@ -18,6 +18,10 @@ struct ContentView: View {
     /// Off by default: therapy values stay hidden unless deliberately requested.
     @AppStorage(MedProbeConstants.diagnosticModeKey) private var diagnosticMode = false
 
+    /// Which characteristics to subscribe to. Stored as a raw string so @AppStorage can
+    /// hold it without the enum needing to be RawRepresentable for AppStorage specifically.
+    @AppStorage(ListeningMode.storageKey) private var listeningMode = ListeningMode.production.rawValue
+
     @State private var isAskingForReading = false
     @State private var readingInput = ""
     @State private var exportFile: ExportFile?
@@ -219,9 +223,28 @@ struct ContentView: View {
         Section("Capture") {
             row("Records", "\(recorder.recordCount)")
 
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Listening mode")
+                    .font(.caption.weight(.semibold))
+                Picker("Listening mode", selection: $listeningMode) {
+                    ForEach(ListeningMode.allCases) { mode in
+                        Text(mode.title).tag(mode.rawValue)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                Text(ListeningMode(rawValue: listeningMode)?.explanation ?? "")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Text("Takes effect on the next connection. Restart the app to apply now.")
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+            }
+            .padding(.vertical, 2)
+
             Toggle(isOn: $diagnosticMode) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Diagnostic mode")
+                    Text("Show therapy fields")
                     Text("Also show insulin delivery and alarm fields. Off by default — MedProbe is a CGM reader.")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
