@@ -1,0 +1,30 @@
+# Garmin project checks.
+#
+# Split out from the iOS workflow so a change under garmin/ or to documentation runs only
+# this — Linux, a few seconds — instead of waking the macOS runner, which bills at ten
+# times the rate and cannot be affected by either.
+
+name: Garmin checks
+
+on:
+  push:
+    paths:
+      - 'garmin/**'
+      - 'MedProbe/Garmin/**'
+      - '.github/workflows/garmin-checks.yml'
+  pull_request:
+    paths:
+      - 'garmin/**'
+      - 'MedProbe/Garmin/**'
+  workflow_dispatch:
+
+jobs:
+  checks:
+    name: Garmin project checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+
+      - name: Run the shared checks
+        run: .github/scripts/garmin-checks.sh

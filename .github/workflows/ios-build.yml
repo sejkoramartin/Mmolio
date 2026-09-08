@@ -2,7 +2,16 @@ name: iOS build
 
 on:
   push:
+    # The macOS runner bills at ten times the Linux rate, so it must not be woken by a
+    # change it cannot be affected by. Documentation and the Garmin project are checked
+    # by the Linux job, which stays cheap.
+    paths-ignore:
+      - '**/*.md'
+      - 'garmin/**'
   pull_request:
+    paths-ignore:
+      - '**/*.md'
+      - 'garmin/**'
   workflow_dispatch:
 
 concurrency:
@@ -285,105 +294,15 @@ jobs:
           echo "=== Background modes ==="
           /usr/libexec/PlistBuddy -c "Print :UIBackgroundModes" "$PLIST"
 
-  # The Connect IQ side.
-  #
-  # A real compile cannot run here. The Connect IQ SDK archive ships the compiler and the
-  # documentation, but not the per-device definitions — those come from the SDK manager,
-  # a desktop tool with no CLI. Without them monkeyc rejects every device qualifier,
-  # including in the universal export:
-  #
-  #     ERROR: 'fr255' is not a valid device / family qualifier.
-  #
-  # So this job checks everything that can be checked without the compiler, and the real
-  # build is a documented local step. See garmin/README.md.
+  # Cheap Linux checks, also run standalone by garmin-checks.yml when only the Garmin
+  # project changes. The real compile needs device definitions the SDK manager fetches,
+  # which CI has no way to obtain — see garmin/README.md.
   garmin:
     name: Garmin project checks
     runs-on: ubuntu-latest
-
     steps:
       - name: Check out
         uses: actions/checkout@v5
 
-      - name: Project structure is complete
-        run: |
-          set -euo pipefail
-          root=garmin/MedProbeWatch
-          for required in \
-            "$root/manifest.xml" \
-            "$root/monkey.jungle" \
-            "$root/source/MedProbeApp.mc" \
-            "$root/source/GlucoseReading.mc" \
-            "$root/source/GlucoseStore.mc" \
-            "$root/source/Formatter.mc" \
-            "$root/source/MedProbeFaceView.mc" \
-            "$root/resources/properties.xml" \
-            "$root/resources-fr255/layouts.xml" \
-            "$root/resources-fr165/layouts.xml"; do
-            test -f "$required" || { echo "::error::missing $required"; exit 1; }
-          done
-          echo "OK: every expected file is present."
-
-      - name: XML is well formed
-        run: |
-          set -euo pipefail
-          python3 - <<'PYEOF'
-          import glob, sys, xml.etree.ElementTree as ET
-          failed = False
-          for path in sorted(glob.glob("garmin/MedProbeWatch/**/*.xml", recursive=True)):
-              try:
-                  ET.parse(path)
-                  print(f"  ok   {path}")
-              except ET.ParseError as error:
-                  print(f"  FAIL {path}: {error}")
-                  failed = True
-          sys.exit(1 if failed else 0)
-          PYEOF
-
-      - name: Both target devices are declared
-        run: |
-          set -euo pipefail
-          manifest=garmin/MedProbeWatch/manifest.xml
-          for device in fr255 fr165; do
-            grep -q "id=\"$device\"" "$manifest" || {
-              echo "::error::$device is not in the manifest"; exit 1; }
-            grep -q "^$device\." garmin/MedProbeWatch/monkey.jungle || {
-              echo "::error::$device has no resource path in monkey.jungle"; exit 1; }
-          done
-          echo "OK: fr255 and fr165 are declared with their own resources."
-
-      # The watch and the phone must agree on the message format. A compiler cannot catch
-      # drift across two languages, so it is checked here.
-      - name: Wire protocol matches on both sides
-        run: |
-          set -euo pipefail
-          SWIFT=MedProbe/Garmin/GarminMessage.swift
-          MONKEY=garmin/MedProbeWatch/source/GlucoseReading.mc
-
-          swift_version=$(grep -oE 'currentVersion = [0-9]+' "$SWIFT" | grep -oE '[0-9]+')
-          monkey_version=$(grep -oE 'SUPPORTED_VERSION = [0-9]+' "$MONKEY" | grep -oE '[0-9]+')
-          echo "protocol version: Swift=$swift_version MonkeyC=$monkey_version"
-          [ "$swift_version" = "$monkey_version" ] || {
-            echo "::error::Protocol version differs between phone and watch"; exit 1; }
-
-          for pair in 'version:v' 'mgdl:g' 'trend:t' 'measuredAt:m' 'source:s' 'sequence:q'; do
-            name=${pair%%:*}
-            key=${pair##*:}
-            grep -q "static let $name = \"$key\"" "$SWIFT" || {
-              echo "::error::Swift key for $name is not \"$key\""; exit 1; }
-            grep -qE "KEY_[A-Z_]+ = \"$key\"" "$MONKEY" || {
-              echo "::error::Monkey C is missing the key \"$key\""; exit 1; }
-          done
-          echo "OK: both sides agree on the wire format."
-
-      # The watch must never present a stale reading as current, so the code that could
-      # do so is checked for the guard rather than trusted.
-      - name: Staleness is handled on the watch
-        run: |
-          set -euo pipefail
-          grep -q "function isStale" garmin/MedProbeWatch/source/GlucoseReading.mc || {
-            echo "::error::GlucoseReading has no isStale"; exit 1; }
-          for view in MedProbeFaceView MedProbeView; do
-            grep -q "isStale" "garmin/MedProbeWatch/source/$view.mc" || {
-              echo "::error::$view does not check staleness"; exit 1; }
-          done
-          echo "OK: staleness is checked wherever a value is drawn."
+      - name: Run the shared checks
+        run: .github/scripts/garmin-checks.sh
