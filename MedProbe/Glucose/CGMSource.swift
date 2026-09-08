@@ -51,7 +51,7 @@ struct ReadingAcceptancePolicy {
     private(set) var lastAcceptedMeasuredAt: Date?
 
     /// Why a reading was turned away.
-    enum Rejection: Equatable {
+    enum Rejection: Error, Equatable {
         case duplicateSequence(Int)
         case olderSequence(incoming: Int, have: Int)
         case olderTimestamp(incoming: Date, have: Date)
