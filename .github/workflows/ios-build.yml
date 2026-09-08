@@ -337,7 +337,9 @@ jobs:
           ls ~/connectiq-sdk
           echo
           echo "=== device definitions shipped with the SDK ==="
-          find ~/connectiq-sdk -maxdepth 3 -iname '*device*' -o -maxdepth 3 -iname 'Devices' | head -20
+          # Confirmed empty on 8.4.1: the archive carries the compiler and docs, and the
+          # SDK manager fetches per-device definitions separately.
+          find ~/connectiq-sdk -maxdepth 3 \( -iname '*device*' -o -iname 'Devices' \) -print | head -20 || true
           echo
           echo "=== device definitions in the user directory ==="
           ls ~/.Garmin/ConnectIQ/Devices 2>/dev/null || echo "(none — these normally come from the SDK manager)"
@@ -360,11 +362,11 @@ jobs:
           for device in fr255 fr165; do
             echo "=== $device ==="
             monkeyc \
-              --jungles garmin/MedProbeWatch/monkey.jungle \
-              --device "$device" \
-              --output "$RUNNER_TEMP/MedProbe-$device.prg" \
-              --private-key "$RUNNER_TEMP/developer_key.der" \
-              --warn
+              -f garmin/MedProbeWatch/monkey.jungle \
+              -d "$device" \
+              -o "$RUNNER_TEMP/MedProbe-$device.prg" \
+              -y "$RUNNER_TEMP/developer_key.der" \
+              -w
           done
 
       - name: Build universal package
@@ -373,13 +375,15 @@ jobs:
           export PATH="$HOME/connectiq-sdk/bin:$PATH"
           # -e exports a package covering every product listed in the manifest, which is
           # where fr255 and fr165 are declared.
+          # -e exports a package rather than building for one device; short flags are
+          # used because they are the ones the compiler's own usage text documents.
           monkeyc \
-            --jungles garmin/MedProbeWatch/monkey.jungle \
-            --output "$RUNNER_TEMP/MedProbe.iq" \
-            --private-key "$RUNNER_TEMP/developer_key.der" \
-            --release \
-            --export-package \
-            --warn
+            -e \
+            -f garmin/MedProbeWatch/monkey.jungle \
+            -o "$RUNNER_TEMP/MedProbe.iq" \
+            -y "$RUNNER_TEMP/developer_key.der" \
+            -r \
+            -w
           ls -lh "$RUNNER_TEMP/MedProbe.iq"
 
       - name: Report which builds ran
