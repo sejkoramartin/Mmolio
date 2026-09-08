@@ -1,0 +1,7 @@
+<strings>
+    <string id="AppName">MedProbe</string>
+    <string id="UseMmolTitle">Show mmol/L</string>
+    <string id="UseMmolPrompt">Off shows mg/dL instead.</string>
+    <string id="StaleMinutesTitle">Mark stale after</string>
+    <string id="StaleMinutesPrompt">Minutes before a reading is shown as out of date.</string>
+</strings>

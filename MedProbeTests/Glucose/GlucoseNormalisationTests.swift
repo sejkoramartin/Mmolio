@@ -83,12 +83,12 @@ final class GlucoseNormalisationTests: XCTestCase {
 
     func testDuplicateSequenceIsRejected() {
         var policy = ReadingAcceptancePolicy()
-        _ = policy.accept(reading(sequence: 10, at: 0))
+        _ = policy.accept(reading(at: 0, sequence: 10))
 
-        let result = policy.accept(reading(sequence: 10, at: 120))
+        let result = policy.accept(reading(at: 120, sequence: 10))
         XCTAssertEqual(try? result.get(), nil)
         if case .failure(let rejection) = result {
-            XCTAssertEqual(rejection, .duplicateSequence(10))
+            XCTAssertEqual(rejection, ReadingAcceptancePolicy.Rejection.duplicateSequence(10))
         } else {
             XCTFail("expected rejection")
         }
@@ -96,11 +96,11 @@ final class GlucoseNormalisationTests: XCTestCase {
 
     func testOlderSequenceIsRejected() {
         var policy = ReadingAcceptancePolicy()
-        _ = policy.accept(reading(sequence: 10, at: 0))
+        _ = policy.accept(reading(at: 0, sequence: 10))
 
-        let result = policy.accept(reading(sequence: 9, at: 120))
+        let result = policy.accept(reading(at: 120, sequence: 9))
         if case .failure(let rejection) = result {
-            XCTAssertEqual(rejection, .olderSequence(incoming: 9, have: 10))
+            XCTAssertEqual(rejection, ReadingAcceptancePolicy.Rejection.olderSequence(incoming: 9, have: 10))
         } else {
             XCTFail("expected rejection")
         }
@@ -123,20 +123,20 @@ final class GlucoseNormalisationTests: XCTestCase {
 
     func testNewerReadingIsAccepted() {
         var policy = ReadingAcceptancePolicy()
-        _ = policy.accept(reading(sequence: 10, at: 0))
+        _ = policy.accept(reading(at: 0, sequence: 10))
 
-        XCTAssertNoThrow(try policy.accept(reading(sequence: 11, at: 120)).get())
+        XCTAssertNoThrow(try policy.accept(reading(at: 120, sequence: 11)).get())
         XCTAssertEqual(policy.lastAcceptedSequence, 11)
     }
 
     func testResetForgetsPosition() {
         var policy = ReadingAcceptancePolicy()
-        _ = policy.accept(reading(sequence: 5000, at: 0))
+        _ = policy.accept(reading(at: 0, sequence: 5000))
 
         policy.reset()
 
         // A new sensor restarts the counter; without reset this would look ancient.
-        XCTAssertNoThrow(try policy.accept(reading(sequence: 3, at: 120)).get())
+        XCTAssertNoThrow(try policy.accept(reading(at: 120, sequence: 3)).get())
     }
 
     // MARK: - Medtrum adapter

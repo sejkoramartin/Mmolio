@@ -284,3 +284,98 @@ jobs:
 
           echo "=== Background modes ==="
           /usr/libexec/PlistBuddy -c "Print :UIBackgroundModes" "$PLIST"
+
+  # The Connect IQ side. Kept in the same workflow so a change to the wire protocol on
+  # either side fails one build rather than two independent ones.
+  garmin:
+    name: Garmin Connect IQ build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+
+      - name: Cache Connect IQ SDK
+        id: cache-sdk
+        uses: actions/cache@v4
+        with:
+          path: ~/connectiq-sdk
+          key: connectiq-sdk-8.4.1
+
+      - name: Install Connect IQ SDK
+        if: steps.cache-sdk.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p ~/connectiq-sdk
+          cd ~/connectiq-sdk
+          curl -sSL -o sdk.zip \
+            https://developer.garmin.com/downloads/connect-iq/sdks/connectiq-sdk-lin-8.4.1-2026-02-03-e9f77eeaa.zip
+          unzip -q sdk.zip
+          rm sdk.zip
+          chmod +x bin/monkeyc bin/monkeydo || true
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Generate a build-only developer key
+        run: |
+          # Signing a build needs a key, but nothing here is distributed, so a throwaway
+          # one is generated per run. A real key is only required to publish to the store,
+          # and must never be committed.
+          openssl genrsa -out "$RUNNER_TEMP/developer_key.pem" 4096
+          openssl pkcs8 -topk8 -inform PEM -outform DER \
+            -in "$RUNNER_TEMP/developer_key.pem" \
+            -out "$RUNNER_TEMP/developer_key.der" -nocrypt
+
+      - name: Build for Forerunner 255
+        run: |
+          set -euo pipefail
+          export PATH="$HOME/connectiq-sdk/bin:$PATH"
+          monkeyc \
+            --jungles garmin/MedProbeWatch/monkey.jungle \
+            --device fr255 \
+            --output "$RUNNER_TEMP/MedProbe-fr255.prg" \
+            --private-key "$RUNNER_TEMP/developer_key.der" \
+            --warn
+          ls -la "$RUNNER_TEMP/MedProbe-fr255.prg"
+
+      - name: Build for Forerunner 165
+        run: |
+          set -euo pipefail
+          export PATH="$HOME/connectiq-sdk/bin:$PATH"
+          monkeyc \
+            --jungles garmin/MedProbeWatch/monkey.jungle \
+            --device fr165 \
+            --output "$RUNNER_TEMP/MedProbe-fr165.prg" \
+            --private-key "$RUNNER_TEMP/developer_key.der" \
+            --warn
+          ls -la "$RUNNER_TEMP/MedProbe-fr165.prg"
+
+      # The watch and the phone must agree on the message format. This checks the two
+      # definitions have not drifted apart, which a compiler cannot catch across languages.
+      - name: Assert the wire protocol matches on both sides
+        run: |
+          set -euo pipefail
+          SWIFT=MedProbe/Garmin/GarminMessage.swift
+          MONKEY=garmin/MedProbeWatch/source/GlucoseReading.mc
+
+          swift_version=$(grep -oE 'currentVersion = [0-9]+' "$SWIFT" | grep -oE '[0-9]+')
+          monkey_version=$(grep -oE 'SUPPORTED_VERSION = [0-9]+' "$MONKEY" | grep -oE '[0-9]+')
+          echo "protocol version: Swift=$swift_version MonkeyC=$monkey_version"
+          [ "$swift_version" = "$monkey_version" ] || {
+            echo "::error::Protocol version differs between phone and watch"
+            exit 1
+          }
+
+          for pair in 'version:v' 'mgdl:g' 'trend:t' 'measuredAt:m' 'source:s' 'sequence:q'; do
+            name=${pair%%:*}
+            key=${pair##*:}
+            grep -q "static let $name = \"$key\"" "$SWIFT" || {
+              echo "::error::Swift key for $name is not \"$key\""; exit 1; }
+            grep -qiE "KEY_[A-Z_]+ = \"$key\"" "$MONKEY" || {
+              echo "::error::Monkey C is missing the key \"$key\""; exit 1; }
+          done
+          echo "OK: both sides agree on the wire format."

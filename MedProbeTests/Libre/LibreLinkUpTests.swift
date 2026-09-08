@@ -92,7 +92,7 @@ final class LibreLinkUpTests: XCTestCase {
 
         let second = policy.accept(LibreLinkUpSource.normalise(measurement))
         if case .failure(let rejection) = second {
-            XCTAssertEqual(rejection, .duplicateSequence(1_757_000_000))
+            XCTAssertEqual(rejection, ReadingAcceptancePolicy.Rejection.duplicateSequence(1_757_000_000))
         } else {
             XCTFail("the same measurement must not be published twice")
         }

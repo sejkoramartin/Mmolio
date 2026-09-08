@@ -1,0 +1,33 @@
+<!--
+  Layout for fr165.
+
+  Geometry only: the behaviour lives in the shared source. Percentages keep the same
+  arrangement working across the round displays in this family.
+-->
+<layouts>
+    <layout id="MainLayout">
+        <label id="glucoseValue" x="center" y="32%" font="Graphics.FONT_NUMBER_HOT"
+               justification="Graphics.TEXT_JUSTIFY_CENTER" color="Graphics.COLOR_WHITE" />
+        <label id="trendArrow" x="center" y="52%" font="Graphics.FONT_LARGE"
+               justification="Graphics.TEXT_JUSTIFY_CENTER" color="Graphics.COLOR_WHITE" />
+        <label id="unit" x="center" y="63%" font="Graphics.FONT_XTINY"
+               justification="Graphics.TEXT_JUSTIFY_CENTER" color="Graphics.COLOR_LT_GRAY" />
+        <label id="age" x="center" y="73%" font="Graphics.FONT_XTINY"
+               justification="Graphics.TEXT_JUSTIFY_CENTER" color="Graphics.COLOR_LT_GRAY" />
+        <label id="source" x="center" y="83%" font="Graphics.FONT_XTINY"
+               justification="Graphics.TEXT_JUSTIFY_CENTER" color="Graphics.COLOR_DK_GRAY" />
+    </layout>
+
+    <layout id="FaceLayout">
+        <label id="faceTime" x="center" y="18%" font="Graphics.FONT_MEDIUM"
+               justification="Graphics.TEXT_JUSTIFY_CENTER" color="Graphics.COLOR_LT_GRAY" />
+        <label id="faceGlucose" x="center" y="36%" font="Graphics.FONT_NUMBER_THAI_HOT"
+               justification="Graphics.TEXT_JUSTIFY_CENTER" color="Graphics.COLOR_WHITE" />
+        <label id="faceArrow" x="center" y="58%" font="Graphics.FONT_LARGE"
+               justification="Graphics.TEXT_JUSTIFY_CENTER" color="Graphics.COLOR_WHITE" />
+        <label id="faceUnit" x="center" y="69%" font="Graphics.FONT_XTINY"
+               justification="Graphics.TEXT_JUSTIFY_CENTER" color="Graphics.COLOR_LT_GRAY" />
+        <label id="faceAge" x="center" y="79%" font="Graphics.FONT_XTINY"
+               justification="Graphics.TEXT_JUSTIFY_CENTER" color="Graphics.COLOR_LT_GRAY" />
+    </layout>
+</layouts>

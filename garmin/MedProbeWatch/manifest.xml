@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<!--
+  MedProbe watch app for Garmin Connect IQ.
+
+  A watch face cannot receive phone messages directly, so the architecture is:
+    phone  ──Connect IQ message──►  this app (background service)
+                                     stores the reading
+                                     publishes a complication
+    watch face  ──subscribes──►     the complication
+
+  The face therefore stays a face, and one small background service owns the data.
+-->
+<iq:manifest xmlns:iq="http://www.garmin.com/xml/connectiq" version="3">
+    <iq:application
+        id="a1b2c3d4e5f647589a0b1c2d3e4f5061"
+        type="watchapp"
+        name="@Strings.AppName"
+        entry="MedProbeApp"
+        launcherIcon="@Drawables.LauncherIcon"
+        minApiLevel="3.2.0">
+
+        <iq:products>
+            <iq:product id="fr255"/>
+            <iq:product id="fr255m"/>
+            <iq:product id="fr255s"/>
+            <iq:product id="fr255sm"/>
+            <iq:product id="fr165"/>
+            <iq:product id="fr165m"/>
+        </iq:products>
+
+        <iq:permissions>
+            <!-- Receiving messages from the phone. -->
+            <iq:uses-permission id="Communications"/>
+            <!-- Running the background service that receives them while the app is closed. -->
+            <iq:uses-permission id="Background"/>
+            <!-- Publishing the glucose complication for the watch face to read. -->
+            <iq:uses-permission id="Complications"/>
+        </iq:permissions>
+
+        <iq:languages>
+            <iq:language>eng</iq:language>
+        </iq:languages>
+    </iq:application>
+</iq:manifest>

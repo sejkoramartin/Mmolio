@@ -1,0 +1,8 @@
+<settings>
+    <setting propertyKey="@Properties.useMmol" title="@Strings.UseMmolTitle">
+        <settingConfig type="boolean"/>
+    </setting>
+    <setting propertyKey="@Properties.staleMinutes" title="@Strings.StaleMinutesTitle">
+        <settingConfig type="numeric" min="5" max="120"/>
+    </setting>
+</settings>
