@@ -12,6 +12,9 @@ using Toybox.Time;
 
 module MedProbe {
 
+    // Visible to the background process, which receives readings while the app is
+    // closed and sees only annotated symbols.
+    (:background)
     class GlucoseReading {
 
         // Protocol version this app understands. A message from a newer phone build is

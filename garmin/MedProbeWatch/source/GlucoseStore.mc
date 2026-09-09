@@ -12,6 +12,9 @@ using Toybox.Application.Storage;
 
 module MedProbe {
 
+    // Visible to the background process, which receives readings while the app is
+    // closed and sees only annotated symbols.
+    (:background)
     class GlucoseStore {
 
         static const STORAGE_KEY = "lastReading";

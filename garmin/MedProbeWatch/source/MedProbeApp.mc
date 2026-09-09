@@ -49,6 +49,11 @@ module MedProbe {
             return [new MedProbeView()];
         }
 
+        // Registers the background service, so readings arrive while the app is closed.
+        function getServiceDelegate() {
+            return [new MedProbeServiceDelegate()];
+        }
+
     }
 
     function getApp() {

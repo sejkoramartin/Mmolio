@@ -29,12 +29,8 @@
         <iq:permissions>
             <!-- Receiving messages from the phone. -->
             <iq:uses-permission id="Communications"/>
-            <!--
-              No Background permission: without a ServiceDelegate the compiler warns that
-              the whole application would be loaded as a background process, which is not
-              what we want. Staying registered while closed needs a service, and that
-              belongs with the watch face work rather than here.
-            -->
+            <!-- Receiving readings while the app is closed, via MedProbeServiceDelegate. -->
+            <iq:uses-permission id="Background"/>
         </iq:permissions>
 
         <iq:languages>

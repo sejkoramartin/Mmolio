@@ -72,14 +72,24 @@ final class ConnectIQTransport: NSObject, GarminTransport {
     /// Selected watch survives relaunch; without it the user would re-pick every time.
     private static let selectedDeviceKey = "medprobe.selectedGarminDevice"
 
+    /// The watches themselves also have to be remembered.
+    ///
+    /// The SDK has no retrieveSavedDevices: it only reports devices as they come back
+    /// from a selection in Garmin Connect. Without storing them, every relaunch showed an
+    /// empty list and required pairing again — which is exactly what happened.
+    private static let knownDevicesKey = "medprobe.knownGarminDevices"
+
     init(log: DiagnosticLog) {
         self.log = log
         super.init()
     }
 
     func start() {
+        // The restoration identifier lets iOS relaunch the app in the background when
+        // BLE activity is seen on a paired watch, rather than only while it is open.
         ConnectIQ.sharedInstance().initialize(withUrlScheme: Self.returnURLScheme,
-                                              uiOverrideDelegate: nil)
+                                              uiOverrideDelegate: nil,
+                                              stateRestorationIdentifier: "cz.sejkora.MedProbe.connectiq")
         restoreKnownDevices()
     }
 
@@ -114,10 +124,37 @@ final class ConnectIQTransport: NSObject, GarminTransport {
         register(returned)
     }
 
+    /// Rebuilds the devices remembered from a previous run.
+    ///
+    /// IQDevice can be reconstructed from its uuid, model and name, so storing those
+    /// three is enough to re-register without sending the user back to Garmin Connect.
     private func restoreKnownDevices() {
-        // The SDK only reports devices the user has already exposed to this app, so there
-        // is nothing to restore until they have been through selection at least once.
-        register(Array(knownDevices.values))
+        guard let stored = UserDefaults.standard.array(forKey: Self.knownDevicesKey) as? [[String: String]] else {
+            return
+        }
+
+        let restored: [IQDevice] = stored.compactMap { entry -> IQDevice? in
+            guard let uuidString = entry["uuid"], let uuid = UUID(uuidString: uuidString) else { return nil }
+            return IQDevice(id: uuid,
+                            modelName: entry["model"] ?? "",
+                            friendlyName: entry["name"] ?? "Garmin")
+        }
+
+        guard !restored.isEmpty else { return }
+        log.info("Garmin: restoring \(restored.count) remembered watch(es)", .diagnostic)
+        register(restored)
+    }
+
+    /// Stores what is needed to rebuild the current devices on the next launch.
+    private func rememberKnownDevices() {
+        let entries = knownDevices.values.map { device in
+            [
+                "uuid": device.uuid.uuidString,
+                "model": device.modelName ?? "",
+                "name": device.friendlyName ?? "Garmin"
+            ]
+        }
+        UserDefaults.standard.set(entries, forKey: Self.knownDevicesKey)
     }
 
     private func register(_ found: [IQDevice]) {
@@ -138,6 +175,7 @@ final class ConnectIQTransport: NSObject, GarminTransport {
                 ConnectIQ.sharedInstance().register(forAppMessages: app, delegate: self)
             }
         }
+        rememberKnownDevices()
         refreshDeviceList()
 
         // Reselect what the user picked last time.
