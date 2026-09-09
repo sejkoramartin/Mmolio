@@ -84,22 +84,40 @@ struct LibreSession: Equatable {
     let token: String
     let accountID: String
     var patientID: String?
+
+    /// The host this session is valid against, discovered at sign-in. Kept so later
+    /// requests do not have to rediscover the region, and so a stored wrong region cannot
+    /// send them somewhere the token is not accepted.
+    var host: String = LibreLinkUpAPI.globalHost
 }
 
 /// Live implementation.
 final class LibreLinkUpAPI: LibreLinkUpFetching {
 
-    /// Abbott's service rejects unknown clients with HTTP 403 — not 401, which is what a
-    /// wrong password gives. Both values below are checked against what currently working
-    /// community clients send (pylibrelinkup, GlucoDataHandler).
+    /// Headers the service expects. Taken from a client that is known to work against
+    /// this account today; sending fewer of them produces a 403 or a nonsense status
+    /// rather than a useful error.
     ///
-    /// `llu.android` is deliberate: every working implementation uses it, and `llu.ios`
-    /// was rejected on this account. The version is bumped by Abbott periodically, and a
-    /// stale one is the usual cause of a sudden 403 across every request.
+    /// `llu.android` is deliberate — `llu.ios` was rejected. The version is bumped by
+    /// Abbott periodically and a stale one is the usual cause of a sudden 403 everywhere.
+    /// The user agent matters too: URLSession's default is not accepted.
     enum Header {
         static let product = "llu.android"
         static let version = "4.16.0"
+        static let userAgent = "LibreLinkUp/4.16.0 (Android; Build 1)"
     }
+
+    /// Region-agnostic entry point.
+    ///
+    /// Signing in here rather than at a regional host lets the service say where the
+    /// account actually lives, which it does with a redirect. That is more reliable than
+    /// asking the user to pick correctly: the wrong choice fails as an authentication
+    /// error with nothing pointing at the region.
+    static let globalHost = "api.libreview.io"
+
+    /// Guards the redirect chain. One hop is normal; more than a couple means something
+    /// is wrong and looping would not help.
+    private static let maximumRedirects = 3
 
     private let session: URLSession
 
@@ -107,17 +125,20 @@ final class LibreLinkUpAPI: LibreLinkUpFetching {
         self.session = session
     }
 
-    private func request(_ path: String, region: LibreRegion, token: String?, accountID: String?) -> URLRequest {
-        var request = URLRequest(url: URL(string: "https://\(region.host)\(path)")!)
+    private func request(_ path: String, host: String, token: String?, accountID: String?) -> URLRequest {
+        var request = URLRequest(url: URL(string: "https://\(host)\(path)")!)
 
-        // The full set the service expects. Omitting any of them has been observed to
-        // produce a 403 rather than a useful error.
+        // The full set. Omitting any of these has been observed to produce a 403 or a
+        // misleading status rather than a useful error.
         request.setValue("application/json", forHTTPHeaderField: "content-type")
+        request.setValue("application/json", forHTTPHeaderField: "accept")
         request.setValue("gzip", forHTTPHeaderField: "accept-encoding")
         request.setValue("no-cache", forHTTPHeaderField: "cache-control")
+        request.setValue("no-cache", forHTTPHeaderField: "pragma")
         request.setValue("Keep-Alive", forHTTPHeaderField: "connection")
         request.setValue(Header.product, forHTTPHeaderField: "product")
         request.setValue(Header.version, forHTTPHeaderField: "version")
+        request.setValue(Header.userAgent, forHTTPHeaderField: "user-agent")
 
         if let token {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -130,7 +151,17 @@ final class LibreLinkUpAPI: LibreLinkUpFetching {
     }
 
     func authenticate(email: String, password: String, region: LibreRegion) async throws -> LibreSession {
-        var request = self.request("/llu/auth/login", region: region, token: nil, accountID: nil)
+        // Start where the service can tell us where the account lives. The stored region
+        // is only a hint: if it is wrong, the redirect corrects it and the correct host
+        // comes back in the session, so the user is never asked to guess again.
+        try await authenticate(email: email, password: password,
+                               host: Self.globalHost, redirectsRemaining: Self.maximumRedirects)
+    }
+
+    private func authenticate(email: String, password: String,
+                              host: String, redirectsRemaining: Int) async throws -> LibreSession {
+
+        var request = self.request("/llu/auth/login", host: host, token: nil, accountID: nil)
         request.httpMethod = "POST"
         request.httpBody = try JSONSerialization.data(
             withJSONObject: ["email": email, "password": password]
@@ -150,17 +181,21 @@ final class LibreLinkUpAPI: LibreLinkUpFetching {
             throw GlucoseSourceError.notAuthenticated(Self.describeLoginStatus(status))
         }
 
-        // 1. Wrong region: the account lives on another host and the service says which.
-        if let redirect = payload["redirect"] as? Bool, redirect {
-            let suggested = (payload["region"] as? String) ?? "unknown"
-            throw GlucoseSourceError.notAuthenticated(
-                "account belongs to region '\(suggested.uppercased())' — change the region and sign in again"
-            )
+        // 1. The account lives elsewhere. Follow it rather than making the user pick.
+        if let redirect = payload["redirect"] as? Bool, redirect,
+           let regionCode = payload["region"] as? String {
+            guard redirectsRemaining > 0 else {
+                throw GlucoseSourceError.notAuthenticated("too many redirects while locating the account")
+            }
+            let regionalHost = "api-\(regionCode.lowercased()).libreview.io"
+            return try await authenticate(email: email, password: password,
+                                          host: regionalHost,
+                                          redirectsRemaining: redirectsRemaining - 1)
         }
 
-        // 2. The account exists and the password is right, but something must be accepted
-        //    first. There is no token until that happens, and it can only be done in the
-        //    official app — MedProbe will not accept terms on anyone's behalf.
+        // 2. Credentials are fine, but something must be accepted first. There is no token
+        //    until that happens, and it can only be done in the official app — MedProbe
+        //    will not accept terms on anyone's behalf.
         if let step = payload["step"] as? [String: Any], let type = step["type"] as? String {
             switch type {
             case "tou":
@@ -188,14 +223,16 @@ final class LibreLinkUpAPI: LibreLinkUpFetching {
             throw GlucoseSourceError.decoding("no account id in login response")
         }
 
-        return LibreSession(token: token, accountID: accountID, patientID: nil)
+        return LibreSession(token: token, accountID: accountID, patientID: nil, host: host)
     }
 
     func fetchLatest(session libreSession: LibreSession, region: LibreRegion) async throws -> LibreGlucoseMeasurement {
-        let patientID = try await resolvePatientID(session: libreSession, region: region)
+        // The host comes from the session, so a redirect discovered at sign-in keeps
+        // applying to every later request.
+        let patientID = try await resolvePatientID(session: libreSession)
 
         let request = request("/llu/connections/\(patientID)/graph",
-                              region: region,
+                              host: libreSession.host,
                               token: libreSession.token,
                               accountID: libreSession.accountID)
 
@@ -214,11 +251,11 @@ final class LibreLinkUpAPI: LibreLinkUpFetching {
 
     /// Finds the followed patient. A follower account can watch several people; without a
     /// stored choice the first connection is used.
-    private func resolvePatientID(session libreSession: LibreSession, region: LibreRegion) async throws -> String {
+    private func resolvePatientID(session libreSession: LibreSession) async throws -> String {
         if let existing = libreSession.patientID { return existing }
 
         let request = request("/llu/connections",
-                              region: region,
+                              host: libreSession.host,
                               token: libreSession.token,
                               accountID: libreSession.accountID)
 

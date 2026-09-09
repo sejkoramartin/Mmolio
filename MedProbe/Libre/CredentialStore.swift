@@ -137,6 +137,7 @@ final class LibreCredentials {
         static let accountID = "accountId"
         static let patientID = "patientId"
         static let region = "region"
+        static let host = "host"
     }
 
     private let store: SecretStoring
@@ -210,6 +211,13 @@ final class LibreCredentials {
         set { write(newValue, for: Key.patientID) }
     }
 
+    /// Host the last successful sign-in ended up on, after any redirect. Nil until the
+    /// first success, in which case the global entry point is used.
+    var host: String? {
+        get { store.value(for: Key.host) }
+        set { write(newValue, for: Key.host) }
+    }
+
     var region: LibreRegion {
         get { LibreRegion(rawValue: store.value(for: Key.region) ?? "") ?? .europe }
         set { write(newValue.rawValue, for: Key.region) }
@@ -229,6 +237,8 @@ final class LibreCredentials {
         token = nil
         accountID = nil
         patientID = nil
+        // The host is deliberately kept: it was discovered by the service and is still
+        // correct even when the token has expired.
     }
 
     /// Removes everything, for sign-out.

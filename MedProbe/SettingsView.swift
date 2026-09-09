@@ -107,6 +107,10 @@ struct SettingsView: View {
                     }
                 }
 
+                Text("Only a hint — MedProbe asks the service where the account lives and follows it. Picking the wrong one here is not fatal.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+
                 TextField("Email", text: $email)
                     .textContentType(.username)
                     .keyboardType(.emailAddress)

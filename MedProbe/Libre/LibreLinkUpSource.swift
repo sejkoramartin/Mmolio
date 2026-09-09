@@ -150,7 +150,10 @@ final class LibreLinkUpSource: CGMSource {
     /// Returns a usable session, signing in if there is not one already.
     private func currentSession() async throws -> LibreSession {
         if let token = credentials.token, let accountID = credentials.accountID {
-            return LibreSession(token: token, accountID: accountID, patientID: credentials.patientID)
+            return LibreSession(token: token,
+                                accountID: accountID,
+                                patientID: credentials.patientID,
+                                host: credentials.host ?? LibreLinkUpAPI.globalHost)
         }
 
         guard let email = credentials.email, let password = credentials.password else {
@@ -162,6 +165,9 @@ final class LibreLinkUpSource: CGMSource {
         await MainActor.run {
             self.credentials.token = session.token
             self.credentials.accountID = session.accountID
+            // Remember where the account actually turned out to live, so later requests
+            // and later launches go straight there.
+            self.credentials.host = session.host
             if let patientID = session.patientID { self.credentials.patientID = patientID }
         }
         return session

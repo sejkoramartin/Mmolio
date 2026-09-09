@@ -295,3 +295,54 @@ extension LibreLinkUpTests {
         XCTAssertTrue(LibreLinkUpAPI.describeLoginStatus(77).contains("77"))
     }
 }
+
+// MARK: - region discovery
+//
+// The service knows where an account lives and says so with a redirect. Following it is
+// more reliable than asking the user to pick, because a wrong pick fails as an
+// authentication error with nothing pointing at the region.
+
+extension LibreLinkUpTests {
+
+    func testSignInStartsAtTheRegionAgnosticHost() {
+        // Starting at a regional host means a wrong stored region fails before the
+        // service ever gets the chance to correct it.
+        XCTAssertEqual(LibreLinkUpAPI.globalHost, "api.libreview.io")
+        XCTAssertFalse(LibreLinkUpAPI.globalHost.contains("-"),
+                       "the entry point must not be a regional host")
+    }
+
+    func testSessionDefaultsToTheGlobalHostUntilOneIsDiscovered() {
+        let session = LibreSession(token: "fake", accountID: "fake", patientID: nil)
+        XCTAssertEqual(session.host, LibreLinkUpAPI.globalHost)
+    }
+
+    func testSessionCarriesTheDiscoveredHost() {
+        let session = LibreSession(token: "fake", accountID: "fake",
+                                   patientID: nil, host: "api-de.libreview.io")
+        XCTAssertEqual(session.host, "api-de.libreview.io")
+    }
+
+    func testDiscoveredHostSurvivesASessionBeingCleared() {
+        let credentials = LibreCredentials(store: InMemorySecretStore())
+        credentials.token = "fake-token"
+        credentials.accountID = "fake-account"
+        credentials.host = "api-de.libreview.io"
+
+        credentials.clearSession()
+
+        // The token expires; where the account lives does not.
+        XCTAssertNil(credentials.token)
+        XCTAssertEqual(credentials.host, "api-de.libreview.io")
+    }
+
+    func testClientSendsTheHeadersTheServiceChecks() {
+        // Verified against a client known to work against this account today.
+        XCTAssertEqual(LibreLinkUpAPI.Header.product, "llu.android")
+        XCTAssertEqual(LibreLinkUpAPI.Header.version, "4.16.0")
+        XCTAssertTrue(LibreLinkUpAPI.Header.userAgent.contains("LibreLinkUp"),
+                      "URLSession's default user agent is not accepted")
+        XCTAssertTrue(LibreLinkUpAPI.Header.userAgent.contains(LibreLinkUpAPI.Header.version),
+                      "the user agent should carry the same version as the header")
+    }
+}
