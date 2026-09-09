@@ -65,6 +65,12 @@ struct MedProbeApp: App {
                              credentials: appDelegate.credentials)
                     .tabItem { Label("Settings", systemImage: "gearshape") }
             }
+            // Garmin Connect hands control back through the medprobe:// scheme after the
+            // user picks their watches. Without this the selection completes on their
+            // side and never reaches us, so no watch ever appears.
+            .onOpenURL { url in
+                appDelegate.coordinator.handleGarminReturn(from: url)
+            }
         }
     }
 }

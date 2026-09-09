@@ -87,6 +87,17 @@ final class GlucoseCoordinator: ObservableObject {
             .store(in: &transportCancellables)
     }
 
+    /// Opens Garmin Connect so the user can grant access to their watches.
+    func findWatches() {
+        log.info("Garmin: opening Connect for device selection", .diagnostic)
+        transport.requestDevices()
+    }
+
+    /// Passes the callback from Garmin Connect back to the transport.
+    func handleGarminReturn(from url: URL) {
+        transport.handleReturn(from: url)
+    }
+
     /// Chooses which watch receives readings.
     func selectWatch(_ device: GarminDevice?) {
         transport.select(device)

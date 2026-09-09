@@ -7,6 +7,7 @@
 //
 
 import XCTest
+import Combine
 @testable import MedProbe
 
 final class GarminMessageTests: XCTestCase {
@@ -207,5 +208,57 @@ extension GarminMessageTests {
 
         XCTAssertEqual(restored, original)
         XCTAssertGreaterThan(original, UInt64(Int64.max), "this value needs the full range")
+    }
+}
+
+// MARK: - device selection is reachable
+//
+// Garmin only reports watches the user has granted access to in Garmin Connect, and that
+// grant has to be triggered from here. An earlier build had the code to do it but nothing
+// calling it, so the watch list stayed empty with no way forward.
+
+extension GarminMessageTests {
+
+    /// Records whether selection was requested and what URL came back.
+    private final class SelectionSpy: GarminTransport {
+        private(set) var devices: [GarminDevice] = []
+        private(set) var selectedDevice: GarminDevice?
+        private(set) var lastSentAt: Date?
+        private(set) var lastError: GarminTransportError?
+        var devicesPublisher: AnyPublisher<[GarminDevice], Never> {
+            Just([]).eraseToAnyPublisher()
+        }
+
+        private(set) var requestedDevices = false
+        private(set) var handledURL: URL?
+
+        func select(_ device: GarminDevice?) { selectedDevice = device }
+        func start() {}
+        func stop() {}
+        func requestDevices() { requestedDevices = true }
+        func handleReturn(from url: URL) { handledURL = url }
+        func send(_ reading: GlucoseReading,
+                  completion: @escaping (Result<Void, GarminTransportError>) -> Void) {
+            completion(.success(()))
+        }
+    }
+
+    func testSelectionCanBeRequestedThroughTheTransport() {
+        let transport = SelectionSpy()
+        XCTAssertFalse(transport.requestedDevices)
+
+        transport.requestDevices()
+
+        XCTAssertTrue(transport.requestedDevices, "the settings screen must be able to open Garmin Connect")
+    }
+
+    func testTheReturnCallbackReachesTheTransport() {
+        let transport = SelectionSpy()
+        let callback = URL(string: "medprobe://connectiq?devices=1")!
+
+        transport.handleReturn(from: callback)
+
+        XCTAssertEqual(transport.handledURL, callback,
+                       "without this the selection completes in Garmin Connect and never reaches us")
     }
 }

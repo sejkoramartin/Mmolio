@@ -81,6 +81,14 @@ protocol GarminTransport: AnyObject {
     func start()
     func stop()
 
+    /// Opens Garmin Connect so the user can grant this app access to their watches.
+    /// Nothing appears in `devices` until they have done this at least once.
+    func requestDevices()
+
+    /// Handles the callback Garmin Connect makes when it hands control back.
+    /// Without this the selection completes on their side and never reaches ours.
+    func handleReturn(from url: URL)
+
     /// Sends a reading. Duplicate and out-of-order suppression happens here, so callers
     /// can hand over every reading they receive.
     func send(_ reading: GlucoseReading, completion: @escaping (Result<Void, GarminTransportError>) -> Void)
@@ -114,6 +122,8 @@ final class UnavailableGarminTransport: GarminTransport {
 
     func start() {}
     func stop() {}
+    func requestDevices() {}
+    func handleReturn(from url: URL) {}
 
     func send(_ reading: GlucoseReading,
               completion: @escaping (Result<Void, GarminTransportError>) -> Void) {

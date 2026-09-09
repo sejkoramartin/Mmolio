@@ -174,8 +174,13 @@ struct SettingsView: View {
     private var watchSection: some View {
         Section("Garmin watch") {
             if coordinator.watches.isEmpty {
-                Text("No watches found")
-                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("No watches yet")
+                        .foregroundStyle(.secondary)
+                    Text("Garmin requires you to grant access in the Garmin Connect app. Tap below — Connect opens, you confirm, and it returns here.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
             } else {
                 ForEach(coordinator.watches) { device in
                     Button {
@@ -197,6 +202,13 @@ struct SettingsView: View {
                     }
                     .buttonStyle(.plain)
                 }
+            }
+
+            Button {
+                coordinator.findWatches()
+            } label: {
+                Label(coordinator.watches.isEmpty ? "Find watches in Garmin Connect" : "Change which watches are shared",
+                      systemImage: "applewatch.radiowaves.left.and.right")
             }
 
             Button("Send a test reading") { sendTest() }
