@@ -4,18 +4,12 @@
 //
 //  Sending readings to a Garmin watch.
 //
-//  ── BLOCKER, read this before wiring anything up ────────────────────────────────────
-//  Actually delivering a message needs Garmin's Connect IQ Mobile SDK for iOS
-//  (ConnectIQ.xcframework). That is a binary distributed from the Garmin developer
-//  portal behind a sign-in; it is not on Swift Package Manager or CocoaPods, and it
-//  cannot be fetched by CI. Until someone downloads it and adds it to the project, the
-//  real transport cannot be built.
+//  Delivery uses Garmin's Connect IQ Companion App SDK, added as a Swift package from
+//  their public repository (garmin/connectiq-companion-app-sdk-ios). The real transport
+//  lives in ConnectIQTransport.swift.
 //
-//  Everything on this side of that line is written, tested and ready: the protocol, the
-//  encoding, the send policy, device selection and the settings screen. `ConnectIQTransport`
-//  below is the single place that needs the framework, and it is deliberately small.
-//  README documents the steps.
-//  ────────────────────────────────────────────────────────────────────────────────────
+//  This protocol still exists so the rest of the app — and its tests — never depend on
+//  that binary, and so the pipeline can be exercised without a watch present.
 //
 
 import Foundation
@@ -92,11 +86,11 @@ protocol GarminTransport: AnyObject {
     func send(_ reading: GlucoseReading, completion: @escaping (Result<Void, GarminTransportError>) -> Void)
 }
 
-/// Transport used until the Connect IQ framework is added to the project.
+/// Stand-in transport for builds without the Connect IQ package, and for tests.
 ///
 /// Records what would have been sent, applies the real send policy, and reports the SDK
-/// as unavailable. This keeps the whole pipeline exercisable — including the settings
-/// screen and the test-send button — without pretending a watch received anything.
+/// as unavailable. It keeps the pipeline exercisable without pretending a watch received
+/// anything.
 final class UnavailableGarminTransport: GarminTransport {
 
     private(set) var devices: [GarminDevice] = []

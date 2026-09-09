@@ -4,10 +4,10 @@
 //
 //  The real Garmin transport, behind a compile-time check.
 //
-//  This file compiles whether or not ConnectIQ.xcframework is present. Without it the
-//  whole implementation is skipped and the app falls back to UnavailableGarminTransport,
-//  which is why the project builds today. Adding the framework switches it on with no
-//  other change — see garmin/README.md for the steps.
+//  The Connect IQ package comes from Garmin's public repository and is declared in
+//  project.yml, so a normal build has it. The canImport guard remains so the project
+//  still compiles if the package is ever removed or fails to resolve, falling back to
+//  the stand-in transport rather than failing outright.
 //
 //  Nothing here is Medtrum- or Libre-specific: it sends whatever GlucoseReading it is
 //  given, to whichever watch is selected.

@@ -133,91 +133,44 @@ Chybějící trend se kreslí jako `?`, nikdy jako vodorovná šipka.
 
 ---
 
-# Zapnutí odesílání do hodinek
+# Odesílání do hodinek
 
-MedProbe zatím do hodinek nic neposílá. Chybí jediná věc: **Connect IQ Mobile SDK pro
-iOS**, binárka, kterou Garmin distribuuje za přihlášením a kterou CI nemůže stáhnout.
+Connect IQ Companion App SDK je Garminem publikovaný **veřejný Swift package**:
 
-Všechno ostatní je hotové. `ConnectIQTransport.swift` je napsaný a schovaný za
-`#if canImport(ConnectIQ)`, takže se projekt kompiluje i bez frameworku a po jeho přidání
-ožije sám. Info.plist už má URL schéma i dotaz na Garmin Connect.
+<https://github.com/garmin/connectiq-companion-app-sdk-ios>
 
-## 1. Stáhni SDK
-
-<https://developer.garmin.com/connect-iq/sdk/> → sekce **Mobile SDK** → **iOS**
-
-Potřebuješ Garmin účet (zdarma). Stáhne se ZIP, v něm je `ConnectIQ.xcframework`.
-
-Jde to i z Linuxu — je to obyčejný ZIP, Mac k tomu není potřeba.
-
-## 2. Rozbal do projektu
-
-```bash
-unzip ~/Stažené/connect-iq-mobile-sdk-ios-*.zip -d /tmp/ciq
-cp -r /tmp/ciq/ConnectIQ.xcframework Frameworks/
-```
-
-Výsledek musí být `Frameworks/ConnectIQ.xcframework/`.
-
-`.gitignore` ho drží mimo repozitář. Garmin ho distribuuje pod vlastní licencí a
-redistribuovat ho není na nás — což platí dvojnásob, kdyby se repozitář někdy zveřejnil.
-
-## 3. Odkomentuj závislost v `project.yml`
-
-V targetu `MedProbe` najdi blok `── Garmin Connect IQ ──` a odkomentuj:
+Je zapsaný v `project.yml` jako závislost, připnutý na verzi 1.8.0. Nic se nestahuje ručně
+a CI si ho vyřeší samo — žádný framework v repozitáři, žádné přihlašování.
 
 ```yaml
-    dependencies:
-      - framework: Frameworks/ConnectIQ.xcframework
-        embed: true
-        codeSign: true
+packages:
+  ConnectIQ:
+    url: https://github.com/garmin/connectiq-companion-app-sdk-ios
+    exactVersion: 1.8.0
 ```
 
-## 4. Ověř identifikátor aplikace
+`ConnectIQTransport.swift` je za `#if canImport(ConnectIQ)`, takže projekt se přeloží
+i kdyby se package někdy nevyřešil — jen by spadl zpět na neaktivní transport.
 
-`ConnectIQTransport.watchAppID` musí být **stejné** jako `id` v
-`garmin/MedProbeWatch/manifest.xml`. Telefon a hodinky se najdou podle něj a podle ničeho
-jiného. Teď je tam:
+## Co ještě zbývá
+
+**1. Identifikátor aplikace musí souhlasit.** `ConnectIQTransport.watchAppID` a `id`
+v `garmin/MedProbeWatch/manifest.xml` se hledají navzájem a musí být shodné. Teď:
 
 ```
 a1b2c3d4e5f647589a0b1c2d3e4f5061
 ```
 
-Můžeš ho nechat, nebo si vygenerovat vlastní (`uuidgen | tr -d '-' | tr 'A-Z' 'a-z'`) —
-ale pak ho změň na **obou** místech.
+Vlastní vygeneruješ přes `uuidgen | tr -d '-' | tr 'A-Z' 'a-z'`, ale pak ho změň na
+**obou** místech.
 
-## 5. Sestav
+**2. Watchapp musí být v hodinkách.** Bez ní není kam posílat. Sestav `.prg` podle
+postupu výše a nahraj přes VS Code rozšíření Monkey C nebo zkopíruj do `GARMIN/APPS`
+na připojených hodinkách.
 
-Od téhle chvíle musí být framework přítomný, jinak build selže na linkování — proto je
-krok 3 až po kroku 2.
+**3. Spárování v telefonu:** MedProbe → Settings → Garmin watch → vyber hodinky
+(otevře se Garmin Connect, potvrdíš, vrátí tě to zpět) → **Send a test reading**.
 
-```bash
-xcodegen generate
-```
-
-CI build a TestFlight workflow fungují beze změny, pokud je framework v pracovní kopii.
-**Pozor:** protože není v gitu, GitHub Actions ho mít nebude a TestFlight build selže.
-Volby jsou dvě:
-
-- framework přidat do repozitáře (funguje hned, ale viz licence výše)
-- nebo ho uložit jako base64 GitHub Secret a ve workflow rozbalit, stejně jako se to dělá
-  s podpisovým certifikátem
-
-## 6. Nainstaluj aplikaci do hodinek
-
-Watchapp z `garmin/MedProbeWatch` musí být v hodinkách, jinak není kam posílat. Nejsnazší
-cesta je rozšíření **Monkey C** pro VS Code: obsahuje SDK manager, simulátor i nasazení
-přes USB.
-
-## 7. Spárování v telefonu
-
-1. V MedProbe → Settings → **Garmin watch**
-2. Vyber hodinky (otevře se Garmin Connect, potvrdíš, vrátí tě to zpět)
-3. **Send a test reading**
-
-Po úspěchu se hodnota objeví na ciferníku. Pokud ne, zkontroluj v tomhle pořadí:
-
-- je watchapp v hodinkách nainstalovaná?
-- souhlasí `watchAppID` s `manifest.xml`?
-- jsou hodinky připojené v Garmin Connect?
-- ukazuje Settings → Garmin watch stav *Connected*?
+Když se hodnota neobjeví, kontroluj v tomhle pořadí: je watchapp nainstalovaná, souhlasí
+`watchAppID` s manifestem, jsou hodinky připojené v Garmin Connect, ukazuje Settings stav
+*Connected*.
