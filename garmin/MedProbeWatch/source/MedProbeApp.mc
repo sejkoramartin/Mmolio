@@ -10,8 +10,8 @@
 
 using Toybox.Application;
 using Toybox.Communications;
-using Toybox.Complications;
 using Toybox.System;
+using Toybox.WatchUi;
 
 module MedProbe {
 
@@ -23,15 +23,15 @@ module MedProbe {
 
         function onStart(state) {
             Communications.registerForPhoneAppMessages(method(:onPhoneMessage));
-            publishComplication();
         }
 
         function onStop(state) {
         }
 
         // Called by Connect IQ when the phone sends a message.
-        function onPhoneMessage(message) {
-            var reading = GlucoseReading.fromMessage(message.data);
+        // The parameter type is fixed by the SDK; a looser one is rejected at compile time.
+        function onPhoneMessage(msg as Communications.PhoneAppMessage) as Void {
+            var reading = GlucoseReading.fromMessage(msg.data);
 
             if (reading == null) {
                 // Either malformed or from a protocol version this build does not know.
@@ -41,7 +41,6 @@ module MedProbe {
             }
 
             if (GlucoseStore.accept(reading)) {
-                publishComplication();
                 WatchUi.requestUpdate();
             }
         }
@@ -50,32 +49,6 @@ module MedProbe {
             return [new MedProbeView()];
         }
 
-        // Publishes the current reading as a complication for watch faces to read.
-        function publishComplication() {
-            if (!(Toybox has :Complications)) {
-                return;
-            }
-
-            var reading = GlucoseStore.load();
-            var complication = new Complications.Complication(
-                new Complications.Id(Complications.COMPLICATION_TYPE_INVALID)
-            );
-
-            if (reading == null) {
-                complication.value = null;
-                complication.shortLabel = "--";
-            } else if (reading.isStale(GlucoseStore.staleThresholdSeconds())) {
-                // A stale value is published with its age so a face can mark it, but never
-                // as though it were current.
-                complication.value = reading.mgdl;
-                complication.shortLabel = Formatter.staleLabel(reading);
-            } else {
-                complication.value = reading.mgdl;
-                complication.shortLabel = Formatter.freshLabel(reading);
-            }
-
-            Complications.updateComplication(complication);
-        }
     }
 
     function getApp() {

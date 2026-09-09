@@ -1,17 +1,17 @@
 # Build configuration.
 #
-# Device-specific resources override the shared ones rather than duplicating logic:
-# fr255 and fr165 differ in screen size and shape, not in behaviour.
+# Only devices whose definitions are installed may be listed here: monkeyc validates every
+# qualifier in this file even when building for a single device, so an entry for a device
+# the SDK manager has not fetched fails the build outright.
+#
+# fr165 is verified. To add fr255, fetch its definition in the Connect IQ SDK manager and
+# uncomment the line below — see README.
 
 project.manifest = manifest.xml
 
 base.sourcePath = source
 base.resourcePath = resources
 
-fr255.resourcePath = $(base.resourcePath);resources-fr255
-fr255m.resourcePath = $(base.resourcePath);resources-fr255
-fr255s.resourcePath = $(base.resourcePath);resources-fr255
-fr255sm.resourcePath = $(base.resourcePath);resources-fr255
-
 fr165.resourcePath = $(base.resourcePath);resources-fr165
-fr165m.resourcePath = $(base.resourcePath);resources-fr165
+
+# fr255.resourcePath = $(base.resourcePath);resources-fr255

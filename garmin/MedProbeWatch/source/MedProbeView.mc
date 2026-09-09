@@ -9,6 +9,7 @@
 //
 
 using Toybox.Graphics;
+using Toybox.Lang;
 using Toybox.WatchUi;
 
 module MedProbe {
@@ -27,11 +28,11 @@ module MedProbe {
             var reading = GlucoseStore.load();
             var isStale = reading != null && reading.isStale(GlucoseStore.staleThresholdSeconds());
 
-            var valueLabel = View.findDrawableById("glucoseValue");
-            var arrowLabel = View.findDrawableById("trendArrow");
-            var unitLabel = View.findDrawableById("unit");
-            var ageLabel = View.findDrawableById("age");
-            var sourceLabel = View.findDrawableById("source");
+            var valueLabel = View.findDrawableById("glucoseValue") as WatchUi.Text?;
+            var arrowLabel = View.findDrawableById("trendArrow") as WatchUi.Text?;
+            var unitLabel = View.findDrawableById("unit") as WatchUi.Text?;
+            var ageLabel = View.findDrawableById("age") as WatchUi.Text?;
+            var sourceLabel = View.findDrawableById("source") as WatchUi.Text?;
 
             if (valueLabel != null) {
                 valueLabel.setText(Formatter.value(reading));

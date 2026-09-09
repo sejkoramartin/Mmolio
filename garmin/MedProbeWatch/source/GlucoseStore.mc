@@ -7,6 +7,7 @@
 // messages, which Connect IQ does routinely.
 //
 
+using Toybox.Application;
 using Toybox.Application.Storage;
 
 module MedProbe {

@@ -3,23 +3,23 @@
 Connect IQ aplikace, která přijímá glykemii z MedProbe na iPhonu a zobrazuje ji na
 Forerunner 255 a Forerunner 165.
 
-## Proč je to rozdělené na dvě části
+## Architektura
 
 Ciferník na Garminu **nemůže** přijímat zprávy z telefonu — Connect IQ to watch face API
-nedovoluje. Architektura je proto:
+nedovoluje. A jedna aplikace nemůže být zároveň watch-app a ciferník. Cílový tvar je proto:
 
 ```
 iPhone (MedProbe)
    │  Connect IQ zpráva
    ▼
-watchapp (MedProbeApp.mc)      ← registruje se pro zprávy, ukládá poslední hodnotu
+watch-app (tento projekt)      ← registruje se pro zprávy, ukládá poslední hodnotu
    │  complication
    ▼
-ciferník (MedProbeFaceView.mc) ← přihlásí se k complication a kreslí ji
+ciferník (samostatný projekt)  ← přihlásí se k complication a kreslí ji
 ```
 
-Watchapp běží jako background service a přežívá restarty, které Connect IQ mezi zprávami
-běžně dělá — proto se hodnota ukládá do `Storage`, ne jen do paměti.
+Hotová je zatím první část. Hodnota se ukládá do `Storage`, ne jen do paměti, protože
+Connect IQ aplikaci mezi zprávami běžně restartuje.
 
 ## Struktura
 
@@ -30,15 +30,28 @@ source/
   GlucoseReading.mc          wire formát a pravidla přijetí zprávy
   GlucoseStore.mc            uložení poslední hodnoty, práh zastarání
   Formatter.mc               hodnota, šipka, stáří, jednotky
-  MedProbeApp.mc             příjem zpráv, publikace complication
-  MedProbeView.mc            obrazovka v aplikaci
-  MedProbeFaceView.mc        ciferník
+  MedProbeApp.mc             příjem zpráv z telefonu
+  MedProbeView.mc            obrazovka s glykemií
 resources/                   sdílené texty a nastavení
-resources-fr255/             layout pro FR255
-resources-fr165/             layout pro FR165
+resources-fr255/             layout pro FR255 (připraveno, čeká na definici zařízení)
+resources-fr165/             layout pro FR165 (ověřeno)
 ```
 
 FR255 a FR165 se liší **jen** rozměry v `layouts.xml`. Logika je sdílená.
+
+## Stav
+
+`fr165` je **ověřený** — projekt se sestaví lokálním SDK 9.2.0 do `.prg`.
+
+`fr255` zatím ne: chybí jeho definice zařízení. Je zakomentovaný v `manifest.xml`
+i `monkey.jungle`, protože monkeyc validuje **každý** qualifier v jungle, i když buduješ
+pro jediné zařízení — takže nesplněný odkaz shodí build úplně. Až stáhneš definici pro
+fr255 v SDK manageru, odkomentuj obojí. Resources pro něj už připravené jsou.
+
+Ciferník v tomhle projektu **není**. Connect IQ nedovolí, aby jedna aplikace byla zároveň
+`watch-app` a `watchface` — musí to být dva samostatné projekty. Tenhle je watch-app:
+přijme zprávu z telefonu, uloží ji a zobrazí. Ciferník, který ji přečte přes complication,
+je další krok.
 
 ## Build
 
