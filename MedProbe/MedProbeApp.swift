@@ -19,9 +19,9 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     /// Keychain-backed LibreLinkUp credentials. Never in UserDefaults or the log.
     let credentials = LibreCredentials(store: KeychainSecretStore())
 
-    /// Replace with the Connect IQ implementation once ConnectIQ.xcframework is added to
-    /// the project — see GarminTransport.swift. Everything else stays as it is.
-    let transport: GarminTransport = UnavailableGarminTransport()
+    /// Picks the real Connect IQ transport when the framework is part of the build, and a
+    /// stand-in otherwise. Adding ConnectIQ.xcframework needs no change here.
+    private(set) lazy var transport: GarminTransport = GarminTransportFactory.make(log: bluetoothManager.log)
 
     private(set) lazy var libreSource = LibreLinkUpSource(
         api: LibreLinkUpAPI(),

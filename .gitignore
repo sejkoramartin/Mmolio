@@ -34,3 +34,8 @@ private_keys/
 
 # macOS
 .DS_Store
+
+# Garmin Connect IQ Mobile SDK — download it, do not commit it.
+# Garmin distributes it behind a sign-in and redistribution is not ours to do.
+Frameworks/*.xcframework/
+Frameworks/*.framework/

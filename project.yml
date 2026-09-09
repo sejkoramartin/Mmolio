@@ -41,6 +41,17 @@ targets:
         CURRENT_PROJECT_VERSION: "1"
         TARGETED_DEVICE_FAMILY: "1"          # iPhone only
         GENERATE_INFOPLIST_FILE: NO
+
+    # ── Garmin Connect IQ ───────────────────────────────────────────────────────────
+    # Uncomment once Frameworks/ConnectIQ.xcframework is in place. Until then the app
+    # builds and runs with the stand-in transport, so leaving this commented is a
+    # working state, not a broken one. See garmin/README.md for the download steps.
+    #
+    # dependencies:
+    #   - framework: Frameworks/ConnectIQ.xcframework
+    #     embed: true
+    #     codeSign: true
+    # ────────────────────────────────────────────────────────────────────────────────
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     info:
       path: MedProbe/Info.plist
@@ -63,6 +74,16 @@ targets:
         # Prepared for later background operation; first-stage testing is foreground only.
         UIBackgroundModes:
           - bluetooth-central
+        # Garmin Connect hands control back through this scheme after the user picks a
+        # watch. It must match ConnectIQTransport.returnURLScheme, or the return trip
+        # fails silently. Declared now so adding the framework needs no Info.plist change.
+        CFBundleURLTypes:
+          - CFBundleURLName: cz.sejkora.MedProbe.connectiq
+            CFBundleURLSchemes:
+              - medprobe
+        # Opening Garmin Connect for device selection requires it to be declared.
+        LSApplicationQueriesSchemes:
+          - gcm-ciq
         # Expose the capture file in Files.app, so a recording can be retrieved even if
         # the export button is unreachable — e.g. after a crash mid-session. These only
         # surface the app's own Documents folder to its owner; they grant no new access.
