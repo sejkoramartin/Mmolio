@@ -182,23 +182,33 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             } else {
+                if coordinator.watches.count > 1 {
+                    Text("Tap a watch to send readings to it.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+
                 ForEach(coordinator.watches) { device in
                     Button {
                         coordinator.selectWatch(device)
                     } label: {
                         HStack {
+                            // An empty circle rather than nothing: without it a row that
+                            // can be tapped looks identical to one that cannot.
+                            Image(systemName: coordinator.selectedWatch?.id == device.id
+                                  ? "checkmark.circle.fill" : "circle")
+                                .foregroundStyle(coordinator.selectedWatch?.id == device.id ? .tint : .secondary)
+
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(device.name)
+                                    .foregroundStyle(.primary)
                                 Text(device.isConnected ? "Connected" : "Not connected")
                                     .font(.caption2)
                                     .foregroundStyle(device.isConnected ? .green : .secondary)
                             }
                             Spacer()
-                            if coordinator.selectedWatch?.id == device.id {
-                                Image(systemName: "checkmark")
-                                    .foregroundStyle(.tint)
-                            }
                         }
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                 }
@@ -212,7 +222,13 @@ struct SettingsView: View {
             }
 
             Button("Send a test reading") { sendTest() }
-                .disabled(coordinator.latestReading == nil)
+                .disabled(coordinator.latestReading == nil || coordinator.selectedWatch == nil)
+
+            if coordinator.selectedWatch == nil && !coordinator.watches.isEmpty {
+                Text("Select a watch above first.")
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+            }
 
             if let error = coordinator.lastSendError {
                 Text(error.userFacingDescription)

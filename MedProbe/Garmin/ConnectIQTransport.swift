@@ -130,6 +130,14 @@ final class ConnectIQTransport: NSObject, GarminTransport {
         if selectedDevice == nil, storedID != 0 {
             selectedDevice = devices.first { $0.id == storedID }
         }
+
+        // With exactly one watch there is nothing to choose between, and leaving it
+        // unselected means readings are silently dropped while the screen shows the watch
+        // as connected — which is precisely what happened on the device.
+        if selectedDevice == nil, devices.count == 1, let only = devices.first {
+            log.info("Garmin: selecting \(only.name), the only watch available", .diagnostic)
+            select(only)
+        }
     }
 
     private func refreshDeviceList() {

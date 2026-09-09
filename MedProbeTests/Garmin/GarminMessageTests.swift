@@ -262,3 +262,55 @@ extension GarminMessageTests {
                        "without this the selection completes in Garmin Connect and never reaches us")
     }
 }
+
+// MARK: - a single watch needs no choosing
+//
+// On the device the watch was found, showed as connected, and readings were still dropped
+// with "No watch selected" — because nothing had selected it. With one watch there is
+// nothing to choose between.
+
+extension GarminMessageTests {
+
+    /// Mirrors the selection rule in ConnectIQTransport.
+    private func autoSelected(from devices: [GarminDevice],
+                              current: GarminDevice?,
+                              stored: UInt64) -> GarminDevice? {
+        if let current { return current }
+        if stored != 0, let remembered = devices.first(where: { $0.id == stored }) {
+            return remembered
+        }
+        return devices.count == 1 ? devices.first : nil
+    }
+
+    func testASingleWatchIsSelectedWithoutBeingAskedFor() {
+        let only = GarminDevice(id: 42, name: "Forerunner 165", isConnected: true)
+
+        XCTAssertEqual(autoSelected(from: [only], current: nil, stored: 0)?.id, 42)
+    }
+
+    func testSeveralWatchesAreLeftForTheUserToChoose() {
+        let watches = [
+            GarminDevice(id: 1, name: "Forerunner 165", isConnected: true),
+            GarminDevice(id: 2, name: "Forerunner 255", isConnected: true)
+        ]
+
+        XCTAssertNil(autoSelected(from: watches, current: nil, stored: 0),
+                     "with a choice to make, making it silently would be wrong")
+    }
+
+    func testARememberedWatchWinsOverAutoSelection() {
+        let watches = [
+            GarminDevice(id: 1, name: "Forerunner 165", isConnected: true),
+            GarminDevice(id: 2, name: "Forerunner 255", isConnected: true)
+        ]
+
+        XCTAssertEqual(autoSelected(from: watches, current: nil, stored: 2)?.id, 2)
+    }
+
+    func testAnExistingSelectionIsNotOverridden() {
+        let current = GarminDevice(id: 9, name: "Forerunner 165", isConnected: true)
+        let others = [GarminDevice(id: 1, name: "Other", isConnected: true)]
+
+        XCTAssertEqual(autoSelected(from: others, current: current, stored: 0)?.id, 9)
+    }
+}
