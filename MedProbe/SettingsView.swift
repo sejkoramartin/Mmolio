@@ -197,7 +197,8 @@ struct SettingsView: View {
                             // can be tapped looks identical to one that cannot.
                             Image(systemName: coordinator.selectedWatch?.id == device.id
                                   ? "checkmark.circle.fill" : "circle")
-                                .foregroundStyle(coordinator.selectedWatch?.id == device.id ? .tint : .secondary)
+                                .foregroundStyle(coordinator.selectedWatch?.id == device.id
+                                                 ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
 
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(device.name)
