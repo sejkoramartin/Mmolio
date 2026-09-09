@@ -31,6 +31,8 @@ private final class RecordingTransport: GarminTransport {
     func select(_ device: GarminDevice?) { selectedDevice = device }
     func start() {}
     func stop() {}
+    func requestDevices() {}
+    func handleReturn(from url: URL) {}
 
     func announce(_ found: [GarminDevice]) {
         devices = found
