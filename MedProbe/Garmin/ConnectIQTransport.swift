@@ -44,6 +44,17 @@ final class ConnectIQTransport: NSObject, GarminTransport {
 
     private var policy = GarminSendPolicy()
     private var knownDevices: [UInt64: IQDevice] = [:]
+
+    /// Stable identity for a device.
+    ///
+    /// Not hashValue: Swift seeds hashing per process, so it changes on every launch and
+    /// the remembered watch would never be found again. The first eight bytes of the
+    /// device UUID are stable and unique enough to tell two watches apart.
+    private static func identity(of device: IQDevice) -> UInt64 {
+        withUnsafeBytes(of: device.uuid.uuid) { raw in
+            raw.prefix(8).reduce(UInt64(0)) { ($0 << 8) | UInt64($1) }
+        }
+    }
     private var watchApps: [UInt64: IQApp] = [:]
     private let log: DiagnosticLog
 
@@ -72,7 +83,7 @@ final class ConnectIQTransport: NSObject, GarminTransport {
 
     func select(_ device: GarminDevice?) {
         selectedDevice = device
-        UserDefaults.standard.set(device?.id ?? 0, forKey: Self.selectedDeviceKey)
+        UserDefaults.standard.set(Int64(bitPattern: device?.id ?? 0), forKey: Self.selectedDeviceKey)
         // Sequence numbers are not comparable across watches any more than across
         // sources: a new watch has seen nothing and must receive the next reading.
         policy.reset()
@@ -100,21 +111,22 @@ final class ConnectIQTransport: NSObject, GarminTransport {
 
     private func register(_ found: [IQDevice]) {
         for device in found {
-            knownDevices[device.uuid.hashValue.magnitude] = device
+            let id = Self.identity(of: device)
+            knownDevices[id] = device
             ConnectIQ.sharedInstance().register(forDeviceEvents: device, delegate: self)
 
             let app = IQApp(uuid: UUID(uuidString: Self.watchAppID),
                             store: nil,
                             device: device)
             if let app {
-                watchApps[device.uuid.hashValue.magnitude] = app
+                watchApps[id] = app
                 ConnectIQ.sharedInstance().register(forAppMessages: app, delegate: self)
             }
         }
         refreshDeviceList()
 
         // Reselect what the user picked last time.
-        let storedID = UInt64(UserDefaults.standard.integer(forKey: Self.selectedDeviceKey))
+        let storedID = UInt64(bitPattern: Int64(UserDefaults.standard.integer(forKey: Self.selectedDeviceKey)))
         if selectedDevice == nil, storedID != 0 {
             selectedDevice = devices.first { $0.id == storedID }
         }

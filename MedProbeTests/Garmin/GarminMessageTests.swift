@@ -167,3 +167,45 @@ final class GarminMessageTests: XCTestCase {
         XCTAssertFalse(GarminDevice(id: 3, name: "Fenix 7", isConnected: true).isKnownSupported)
     }
 }
+
+// MARK: - device identity
+//
+// The selected watch is remembered across launches, so whatever identifies it has to
+// survive a restart. Swift seeds hashing per process, which hashValue does not.
+
+extension GarminMessageTests {
+
+    /// Same derivation ConnectIQTransport uses: the first eight bytes of the UUID.
+    private func identity(of uuid: UUID) -> UInt64 {
+        withUnsafeBytes(of: uuid.uuid) { raw in
+            raw.prefix(8).reduce(UInt64(0)) { ($0 << 8) | UInt64($1) }
+        }
+    }
+
+    func testDeviceIdentityIsDerivedFromTheUUIDAndIsStable() {
+        let uuid = UUID(uuidString: "12345678-9ABC-DEF0-1234-56789ABCDEF0")!
+
+        // Deterministic: the same UUID must give the same id in any process.
+        XCTAssertEqual(identity(of: uuid), identity(of: uuid))
+        XCTAssertEqual(identity(of: uuid), 0x123456789ABCDEF0)
+    }
+
+    func testDifferentWatchesGetDifferentIdentities() {
+        let first = UUID(uuidString: "12345678-9ABC-DEF0-1234-56789ABCDEF0")!
+        let second = UUID(uuidString: "22345678-9ABC-DEF0-1234-56789ABCDEF0")!
+
+        XCTAssertNotEqual(identity(of: first), identity(of: second))
+    }
+
+    func testIdentitySurvivesStorageAsASignedInteger() {
+        // UserDefaults stores Int, so a large UInt64 has to round-trip through the bit
+        // pattern rather than being clamped.
+        let original = identity(of: UUID(uuidString: "FFFFFFFF-FFFF-FFFF-1234-56789ABCDEF0")!)
+
+        let stored = Int64(bitPattern: original)
+        let restored = UInt64(bitPattern: stored)
+
+        XCTAssertEqual(restored, original)
+        XCTAssertGreaterThan(original, UInt64(Int64.max), "this value needs the full range")
+    }
+}
