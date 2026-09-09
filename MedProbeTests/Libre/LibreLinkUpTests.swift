@@ -183,3 +183,85 @@ final class LibreLinkUpTests: XCTestCase {
         XCTAssertEqual(LibreHeartbeatListener.serviceUUID.uuidString, "FDE3")
     }
 }
+
+// MARK: - client headers
+//
+// A 403 from LibreLinkUp is about the client, not the password, and these two values are
+// what the service checks. They are pinned so a change is deliberate rather than accidental.
+
+extension LibreLinkUpTests {
+
+    func testClientIdentifiesItselfTheWayTheServiceExpects() {
+        // llu.ios was rejected with 403 on a real account; every working community client
+        // sends llu.android.
+        XCTAssertEqual(LibreLinkUpAPI.Header.product, "llu.android")
+        XCTAssertFalse(LibreLinkUpAPI.Header.version.isEmpty)
+    }
+
+    func testAccountIdIsHashedNotSentInClear() {
+        let hashed = LibreLinkUpAPI.sha256Hex("some-account-id")
+
+        XCTAssertEqual(hashed.count, 64, "SHA-256 as hex is 64 characters")
+        XCTAssertFalse(hashed.contains("some-account-id"))
+        // Same input, same digest — the header has to be stable across requests.
+        XCTAssertEqual(hashed, LibreLinkUpAPI.sha256Hex("some-account-id"))
+        XCTAssertNotEqual(hashed, LibreLinkUpAPI.sha256Hex("another-account-id"))
+    }
+
+    func testKnownDigest() {
+        // Pins the implementation against a published vector, so a broken hash cannot
+        // pass by being merely self-consistent.
+        XCTAssertEqual(LibreLinkUpAPI.sha256Hex("abc"),
+                       "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
+    }
+}
+
+// MARK: - Keychain failures are reported
+
+extension LibreLinkUpTests {
+
+    /// Refuses every write, standing in for a Keychain that is unavailable.
+    private final class FailingSecretStore: SecretStoring {
+        func set(_ value: String?, for key: String) throws {
+            throw KeychainError.unexpectedStatus(errSecMissingEntitlement)
+        }
+        func value(for key: String) -> String? { nil }
+        func removeAll() throws {}
+    }
+
+    func testAFailedKeychainWriteIsReportedRatherThanAppearingToSucceed() {
+        let credentials = LibreCredentials(store: FailingSecretStore())
+
+        let result = credentials.storeLogin(email: "nobody@example.invalid",
+                                            password: "not-a-real-password",
+                                            region: .europe)
+
+        // The bug this replaces: the form went to its signed-in state while hasLogin
+        // stayed false, and the source then reported no account configured.
+        guard case .failure = result else {
+            return XCTFail("a Keychain that stores nothing must not report success")
+        }
+        XCTAssertFalse(credentials.hasLogin)
+    }
+
+    func testASuccessfulWriteIsConfirmedByReadingItBack() {
+        let credentials = LibreCredentials(store: InMemorySecretStore())
+
+        let result = credentials.storeLogin(email: "nobody@example.invalid",
+                                            password: "not-a-real-password",
+                                            region: .germany)
+
+        XCTAssertNoThrow(try result.get())
+        XCTAssertTrue(credentials.hasLogin)
+        XCTAssertEqual(credentials.region, .germany)
+        XCTAssertFalse(credentials.hasSession, "storing a login must not fabricate a session")
+    }
+
+    func testKeychainErrorsDescribeThemselvesUsefully() {
+        let missing = KeychainError.unexpectedStatus(errSecMissingEntitlement)
+        XCTAssertTrue(missing.diagnosticDescription.contains("entitlement"))
+
+        let unknown = KeychainError.unexpectedStatus(-12345)
+        XCTAssertTrue(unknown.diagnosticDescription.contains("-12345"))
+    }
+}

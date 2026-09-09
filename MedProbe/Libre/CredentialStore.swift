@@ -21,6 +21,26 @@ protocol SecretStoring: AnyObject {
 
 enum KeychainError: Error, Equatable {
     case unexpectedStatus(OSStatus)
+
+    /// The raw status, plus a name for the ones that actually come up, so a failure can be
+    /// acted on rather than merely reported.
+    var diagnosticDescription: String {
+        guard case .unexpectedStatus(let status) = self else { return "unknown" }
+        switch status {
+        case errSecMissingEntitlement:
+            return "missing entitlement (\(status)) — the app is not allowed to use the Keychain"
+        case errSecNotAvailable:
+            return "Keychain unavailable (\(status)) — the device may still be locked"
+        case errSecAuthFailed:
+            return "authentication failed (\(status))"
+        case errSecItemNotFound:
+            return "written but not readable back (\(status))"
+        case errSecInteractionNotAllowed:
+            return "interaction not allowed (\(status)) — locked device"
+        default:
+            return "OSStatus \(status)"
+        }
+    }
 }
 
 /// Keychain implementation.
@@ -103,9 +123,14 @@ final class InMemorySecretStore: SecretStoring {
 
 /// The credentials and session state LibreLinkUp needs, kept together so nothing leaks
 /// into general app storage.
+///
+/// Writes report failure rather than swallowing it. An earlier version used `try?`
+/// everywhere, so a Keychain that refused to store anything left the app claiming to be
+/// signed in while `hasLogin` stayed false — the sign-in form disappeared and the source
+/// then said "no LibreLinkUp account configured", with nothing to explain the difference.
 final class LibreCredentials {
 
-    private enum Key {
+    fileprivate enum Key {
         static let email = "email"
         static let password = "password"
         static let token = "token"
@@ -116,41 +141,78 @@ final class LibreCredentials {
 
     private let store: SecretStoring
 
+    /// Last write failure, so the UI can show what actually went wrong.
+    private(set) var lastStoreError: KeychainError?
+
     init(store: SecretStoring) {
         self.store = store
     }
 
+    /// Writes a value, remembering any failure instead of discarding it.
+    private func write(_ value: String?, for key: String) {
+        do {
+            try store.set(value, for: key)
+            lastStoreError = nil
+        } catch let error as KeychainError {
+            lastStoreError = error
+        } catch {
+            lastStoreError = .unexpectedStatus(errSecInternalError)
+        }
+    }
+
+    /// Stores the login and confirms it can be read back.
+    ///
+    /// The round trip is the point: a write that reports success but stores nothing is
+    /// exactly the failure this is here to catch.
+    @discardableResult
+    func storeLogin(email: String, password: String, region: LibreRegion) -> Result<Void, KeychainError> {
+        self.region = region
+        write(email, for: Key.email)
+        write(password, for: Key.password)
+        clearSession()
+
+        if let error = lastStoreError {
+            return .failure(error)
+        }
+        guard hasLogin else {
+            // Nothing threw, yet nothing came back. Report it rather than let the UI
+            // believe the sign-in worked.
+            return .failure(.unexpectedStatus(errSecItemNotFound))
+        }
+        return .success(())
+    }
+
     var email: String? {
         get { store.value(for: Key.email) }
-        set { try? store.set(newValue, for: Key.email) }
+        set { write(newValue, for: Key.email) }
     }
 
     var password: String? {
         get { store.value(for: Key.password) }
-        set { try? store.set(newValue, for: Key.password) }
+        set { write(newValue, for: Key.password) }
     }
 
     /// Bearer token from the last successful sign-in.
     var token: String? {
         get { store.value(for: Key.token) }
-        set { try? store.set(newValue, for: Key.token) }
+        set { write(newValue, for: Key.token) }
     }
 
     /// Account identifier, hashed into a required request header by the API.
     var accountID: String? {
         get { store.value(for: Key.accountID) }
-        set { try? store.set(newValue, for: Key.accountID) }
+        set { write(newValue, for: Key.accountID) }
     }
 
     /// The followed patient whose readings we fetch.
     var patientID: String? {
         get { store.value(for: Key.patientID) }
-        set { try? store.set(newValue, for: Key.patientID) }
+        set { write(newValue, for: Key.patientID) }
     }
 
     var region: LibreRegion {
         get { LibreRegion(rawValue: store.value(for: Key.region) ?? "") ?? .europe }
-        set { try? store.set(newValue.rawValue, for: Key.region) }
+        set { write(newValue.rawValue, for: Key.region) }
     }
 
     var hasLogin: Bool {

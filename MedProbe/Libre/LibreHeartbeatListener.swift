@@ -94,6 +94,11 @@ final class LibreHeartbeatListener: NSObject {
     }
 
     func stop() {
+        // Nothing to report if it was never running: the coordinator calls stop() on
+        // every source switch, and logging "stopped" each time is noise that reads like
+        // something went wrong.
+        guard central != nil else { return }
+
         if let peripheral, let central {
             // Unsubscribe before letting go, so nothing is left enabled on a link the
             // official app owns.

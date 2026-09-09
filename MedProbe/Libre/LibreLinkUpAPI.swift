@@ -89,11 +89,16 @@ struct LibreSession: Equatable {
 /// Live implementation.
 final class LibreLinkUpAPI: LibreLinkUpFetching {
 
-    /// Abbott's service rejects unknown clients; these headers mirror what the official
-    /// mobile app sends. They are not a secret and contain nothing user-specific.
-    private enum Header {
-        static let product = "llu.ios"
-        static let version = "4.12.0"
+    /// Abbott's service rejects unknown clients with HTTP 403 — not 401, which is what a
+    /// wrong password gives. Both values below are checked against what currently working
+    /// community clients send (pylibrelinkup, GlucoDataHandler).
+    ///
+    /// `llu.android` is deliberate: every working implementation uses it, and `llu.ios`
+    /// was rejected on this account. The version is bumped by Abbott periodically, and a
+    /// stale one is the usual cause of a sudden 403 across every request.
+    enum Header {
+        static let product = "llu.android"
+        static let version = "4.16.0"
     }
 
     private let session: URLSession
@@ -104,7 +109,13 @@ final class LibreLinkUpAPI: LibreLinkUpFetching {
 
     private func request(_ path: String, region: LibreRegion, token: String?, accountID: String?) -> URLRequest {
         var request = URLRequest(url: URL(string: "https://\(region.host)\(path)")!)
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        // The full set the service expects. Omitting any of them has been observed to
+        // produce a 403 rather than a useful error.
+        request.setValue("application/json", forHTTPHeaderField: "content-type")
+        request.setValue("gzip", forHTTPHeaderField: "accept-encoding")
+        request.setValue("no-cache", forHTTPHeaderField: "cache-control")
+        request.setValue("Keep-Alive", forHTTPHeaderField: "connection")
         request.setValue(Header.product, forHTTPHeaderField: "product")
         request.setValue(Header.version, forHTTPHeaderField: "version")
 
@@ -113,7 +124,7 @@ final class LibreLinkUpAPI: LibreLinkUpFetching {
         }
         if let accountID {
             // The API expects the account id as a SHA-256 hex digest in this header.
-            request.setValue(Self.sha256Hex(accountID), forHTTPHeaderField: "Account-Id")
+            request.setValue(Self.sha256Hex(accountID), forHTTPHeaderField: "account-id")
         }
         return request
     }
@@ -262,8 +273,14 @@ final class LibreLinkUpAPI: LibreLinkUpFetching {
         switch http.statusCode {
         case 200...299:
             return
-        case 401, 403:
-            throw GlucoseSourceError.notAuthenticated("HTTP \(http.statusCode)")
+        case 401:
+            throw GlucoseSourceError.notAuthenticated("HTTP 401 — email or password rejected")
+        case 403:
+            // Not a credential problem: the service refuses the client itself, almost
+            // always because the product/version headers no longer match what it expects.
+            throw GlucoseSourceError.notAuthenticated(
+                "HTTP 403 — service refused this client (product \(Header.product), version \(Header.version)); the version may need updating"
+            )
         case 429:
             let retryAfter = (http.value(forHTTPHeaderField: "Retry-After")).flatMap(TimeInterval.init) ?? 60
             throw GlucoseSourceError.rateLimited(retryAfter: retryAfter)

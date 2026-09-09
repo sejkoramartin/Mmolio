@@ -232,14 +232,20 @@ struct SettingsView: View {
     private func signIn() {
         // Only the credentials are stored here; the source signs in on its next fetch and
         // reports the outcome through its state, so a wrong password surfaces there.
-        credentials.region = region
-        credentials.email = email
-        credentials.password = password
-        credentials.clearSession()
+        //
+        // The result is checked rather than assumed. A Keychain write that fails silently
+        // used to leave the form looking signed in while the source reported no account
+        // configured, with nothing connecting the two.
+        switch credentials.storeLogin(email: email, password: password, region: region) {
+        case .success:
+            isSignedIn = true
+            password = ""
+            statusMessage = "Saved. Select LibreLinkUp as the source to connect."
 
-        isSignedIn = true
-        password = ""
-        statusMessage = "Saved. Select LibreLinkUp as the source to connect."
+        case .failure(let error):
+            isSignedIn = false
+            statusMessage = "Could not save to the Keychain: \(error.diagnosticDescription). Nothing was stored."
+        }
     }
 
     private func sendTest() {
