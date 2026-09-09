@@ -143,25 +143,45 @@ final class LibreLinkUpAPI: LibreLinkUpFetching {
             throw GlucoseSourceError.decoding("login response was not an object")
         }
 
-        // A non-zero status with no data usually means the region is wrong, which is by
-        // far the most common setup mistake — so it is called out rather than surfaced as
-        // a generic decoding failure.
+        // The service answers a sign-in in one of four ways, and telling them apart is
+        // the difference between a useful message and "something went wrong".
         guard let payload = root["data"] as? [String: Any] else {
             let status = root["status"] as? Int ?? -1
+            throw GlucoseSourceError.notAuthenticated(Self.describeLoginStatus(status))
+        }
+
+        // 1. Wrong region: the account lives on another host and the service says which.
+        if let redirect = payload["redirect"] as? Bool, redirect {
+            let suggested = (payload["region"] as? String) ?? "unknown"
             throw GlucoseSourceError.notAuthenticated(
-                "sign-in refused (status \(status)); check the account region"
+                "account belongs to region '\(suggested.uppercased())' — change the region and sign in again"
             )
         }
 
-        // Some accounts answer with a redirect to their correct region instead of a token.
-        if let redirect = payload["redirect"] as? Bool, redirect {
-            let suggested = (payload["region"] as? String) ?? "unknown"
-            throw GlucoseSourceError.notAuthenticated("account belongs to region '\(suggested)'")
+        // 2. The account exists and the password is right, but something must be accepted
+        //    first. There is no token until that happens, and it can only be done in the
+        //    official app — MedProbe will not accept terms on anyone's behalf.
+        if let step = payload["step"] as? [String: Any], let type = step["type"] as? String {
+            switch type {
+            case "tou":
+                throw GlucoseSourceError.notAuthenticated(
+                    "LibreLinkUp needs the terms of use accepted — open the LibreLinkUp app, accept them, then sign in here again"
+                )
+            case "pp":
+                throw GlucoseSourceError.notAuthenticated(
+                    "LibreLinkUp needs the privacy policy accepted — open the LibreLinkUp app, accept it, then sign in here again"
+                )
+            default:
+                throw GlucoseSourceError.notAuthenticated(
+                    "LibreLinkUp wants something confirmed first (step '\(type)') — open the LibreLinkUp app and complete it"
+                )
+            }
         }
 
+        // 3. A token, which is the only case that continues.
         guard let auth = payload["authTicket"] as? [String: Any],
               let token = auth["token"] as? String else {
-            throw GlucoseSourceError.decoding("no auth ticket in login response")
+            throw GlucoseSourceError.decoding("sign-in returned neither a token nor a reason")
         }
         guard let user = payload["user"] as? [String: Any],
               let accountID = user["id"] as? String else {
@@ -286,6 +306,24 @@ final class LibreLinkUpAPI: LibreLinkUpFetching {
             throw GlucoseSourceError.rateLimited(retryAfter: retryAfter)
         default:
             throw GlucoseSourceError.transport("HTTP \(http.statusCode)")
+        }
+    }
+
+    /// Turns the service's own status code into something actionable.
+    ///
+    /// These are not HTTP codes. 2 is by far the most common and means exactly what it
+    /// says — the email or password is wrong — so it must not be reported as a region
+    /// problem, which is what an earlier version did.
+    static func describeLoginStatus(_ status: Int) -> String {
+        switch status {
+        case 2:
+            return "email or password is wrong (status 2). Note these are LibreLinkUp credentials, which are a separate account from the Libre app itself"
+        case 4:
+            return "account needs something accepted in the LibreLinkUp app first (status 4)"
+        case 429:
+            return "too many sign-in attempts (status 429) — wait a few minutes"
+        default:
+            return "sign-in refused (status \(status))"
         }
     }
 

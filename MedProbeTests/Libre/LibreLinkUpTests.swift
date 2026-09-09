@@ -265,3 +265,33 @@ extension LibreLinkUpTests {
         XCTAssertTrue(unknown.diagnosticDescription.contains("-12345"))
     }
 }
+
+// MARK: - why a sign-in was refused
+//
+// The service has four distinct answers to a sign-in and they need four distinct
+// messages. An earlier version reported all of them as a region problem, which sent the
+// user looking in the wrong place.
+
+extension LibreLinkUpTests {
+
+    func testStatusTwoIsReportedAsWrongCredentialsNotAsARegionProblem() {
+        let message = LibreLinkUpAPI.describeLoginStatus(2)
+
+        XCTAssertTrue(message.lowercased().contains("password"))
+        XCTAssertFalse(message.lowercased().contains("region"),
+                       "status 2 is a credential problem; saying region sends the user the wrong way")
+    }
+
+    func testStatusTwoMentionsThatLibreLinkUpIsASeparateAccount() {
+        // The most common cause: trying the Libre app's own credentials.
+        XCTAssertTrue(LibreLinkUpAPI.describeLoginStatus(2).contains("separate account"))
+    }
+
+    func testRateLimitStatusSuggestsWaiting() {
+        XCTAssertTrue(LibreLinkUpAPI.describeLoginStatus(429).lowercased().contains("wait"))
+    }
+
+    func testUnknownStatusStillReportsItsNumber() {
+        XCTAssertTrue(LibreLinkUpAPI.describeLoginStatus(77).contains("77"))
+    }
+}
