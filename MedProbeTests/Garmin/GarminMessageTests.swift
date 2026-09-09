@@ -314,3 +314,46 @@ extension GarminMessageTests {
         XCTAssertEqual(autoSelected(from: others, current: current, stored: 0)?.id, 9)
     }
 }
+
+// MARK: - the watch app id
+//
+// Connect IQ manifests write the id as 32 bare hex characters; Foundation's UUID parser
+// wants 8-4-4-4-12 and returns nil otherwise. IQApp accepts a nil uuid without complaint
+// and then addresses nothing, so every message failed with a timeout several seconds
+// later, with nothing pointing at the id. That is what this converts.
+
+extension GarminMessageTests {
+
+    func testBareHexFromAConnectIQManifestBecomesAUUID() {
+        let fromManifest = "a1b2c3d4e5f647589a0b1c2d3e4f5061"
+
+        XCTAssertEqual(ConnectIQAppID.hyphenated(fromManifest), "a1b2c3d4-e5f6-4758-9a0b-1c2d3e4f5061")
+        XCTAssertNotNil(ConnectIQAppID.uuid(from: fromManifest))
+    }
+
+    func testFoundationCannotParseTheManifestFormDirectly() {
+        // The reason this converter exists.
+        XCTAssertNil(UUID(uuidString: "a1b2c3d4e5f647589a0b1c2d3e4f5061"))
+    }
+
+    func testAnAlreadyHyphenatedIdIsAccepted() {
+        let hyphenated = "a1b2c3d4-e5f6-4758-9a0b-1c2d3e4f5061"
+
+        XCTAssertEqual(ConnectIQAppID.uuid(from: hyphenated),
+                       ConnectIQAppID.uuid(from: "a1b2c3d4e5f647589a0b1c2d3e4f5061"))
+    }
+
+    func testMalformedIdsAreRejectedRatherThanProducingAnUnaddressedApp() {
+        XCTAssertNil(ConnectIQAppID.uuid(from: ""))
+        XCTAssertNil(ConnectIQAppID.uuid(from: "tooshort"))
+        XCTAssertNil(ConnectIQAppID.uuid(from: "a1b2c3d4e5f647589a0b1c2d3e4f50"), "31 characters")
+        XCTAssertNil(ConnectIQAppID.uuid(from: "a1b2c3d4e5f647589a0b1c2d3e4f506123"), "34 characters")
+        XCTAssertNil(ConnectIQAppID.uuid(from: "zzzzzzzze5f647589a0b1c2d3e4f5061"), "not hex")
+    }
+
+    func testTheIdInUseMatchesTheWatchManifest() {
+        // If these two ever drift apart the phone addresses an app that does not exist.
+        // The Monkey C side is checked by the Garmin CI script; this pins the Swift side.
+        XCTAssertEqual(ConnectIQAppID.hyphenated("a1b2c3d4e5f647589a0b1c2d3e4f5061")?.count, 36)
+    }
+}

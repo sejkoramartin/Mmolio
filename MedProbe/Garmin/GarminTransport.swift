@@ -142,3 +142,28 @@ final class UnavailableGarminTransport: GarminTransport {
         completion(.failure(.sdkUnavailable))
     }
 }
+
+/// Converting a Connect IQ application id into a Foundation UUID.
+///
+/// Kept outside the framework-conditional code so it is testable in any build, and
+/// separate because getting it wrong is silent: IQApp accepts a nil uuid and then
+/// addresses nothing, so every message fails with a timeout some seconds later and
+/// nothing points at the id.
+enum ConnectIQAppID {
+
+    /// Inserts the hyphens a UUID string needs. Accepts either form, since Connect IQ
+    /// manifests write 32 bare hex characters and Foundation wants 8-4-4-4-12.
+    static func hyphenated(_ identifier: String) -> String? {
+        let hex = identifier.replacingOccurrences(of: "-", with: "")
+        guard hex.count == 32, hex.allSatisfy({ $0.isHexDigit }) else { return nil }
+
+        let characters = Array(hex)
+        let groups = [0 ..< 8, 8 ..< 12, 12 ..< 16, 16 ..< 20, 20 ..< 32]
+        return groups.map { String(characters[$0]) }.joined(separator: "-")
+    }
+
+    /// The id as a UUID, or nil if it is not one.
+    static func uuid(from identifier: String) -> UUID? {
+        hyphenated(identifier).flatMap(UUID.init(uuidString:))
+    }
+}
