@@ -45,6 +45,11 @@ final class GlucoseCoordinator: ObservableObject {
     @Published private(set) var lastSentAt: Date?
     @Published private(set) var lastSendError: GarminTransportError?
 
+    /// Watches the transport knows about, republished here because GarminTransport is a
+    /// protocol rather than an ObservableObject and SwiftUI needs something to observe.
+    @Published private(set) var watches: [GarminDevice] = []
+    @Published private(set) var selectedWatch: GarminDevice?
+
     private let medtrum: MedtrumSource
     private let libre: LibreLinkUpSource
     private let transport: GarminTransport
@@ -52,6 +57,9 @@ final class GlucoseCoordinator: ObservableObject {
     private let log: DiagnosticLog
 
     private var cancellables = Set<AnyCancellable>()
+
+    /// Separate from `cancellables`, which is cleared on every source switch.
+    private var transportCancellables = Set<AnyCancellable>()
 
     init(medtrum: MedtrumSource,
          libre: LibreLinkUpSource,
@@ -69,6 +77,20 @@ final class GlucoseCoordinator: ObservableObject {
         heartbeat.onHeartbeat = { [weak self] _ in
             self?.libre.requestImmediateFetch(reason: "Libre heartbeat")
         }
+
+        transport.devicesPublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] devices in
+                self?.watches = devices
+                self?.selectedWatch = self?.transport.selectedDevice
+            }
+            .store(in: &transportCancellables)
+    }
+
+    /// Chooses which watch receives readings.
+    func selectWatch(_ device: GarminDevice?) {
+        transport.select(device)
+        selectedWatch = device
     }
 
     var activeSource: CGMSource {
