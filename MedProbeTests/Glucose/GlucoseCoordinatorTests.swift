@@ -139,17 +139,20 @@ final class GlucoseCoordinatorTests: XCTestCase {
         XCTAssertEqual(transport.devices.count, 1)
     }
 
-    func testSourceSelectionDefaultsToMedtrumAndSurvivesABadStoredValue() {
+    func testSourceSelectionSurvivesAnUnsetOrBadStoredValue() {
         let defaults = UserDefaults.standard
         let previous = defaults.string(forKey: SelectedSource.storageKey)
         defer { defaults.set(previous, forKey: SelectedSource.storageKey) }
 
+        // Nothing stored yet.
         defaults.removeObject(forKey: SelectedSource.storageKey)
-        XCTAssertEqual(SelectedSource.current, .medtrum)
+        XCTAssertEqual(SelectedSource.current, SelectedSource.defaultSource)
 
+        // Nonsense stored: must not leave the app without a source.
         defaults.set("nonsense", forKey: SelectedSource.storageKey)
-        XCTAssertEqual(SelectedSource.current, .medtrum, "a bad value must not leave the app without a source")
+        XCTAssertEqual(SelectedSource.current, SelectedSource.defaultSource)
 
+        // Something real and offered.
         defaults.set(SelectedSource.libreLinkUp.rawValue, forKey: SelectedSource.storageKey)
         XCTAssertEqual(SelectedSource.current, .libreLinkUp)
     }
