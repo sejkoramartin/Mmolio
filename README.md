@@ -1,19 +1,29 @@
 # MedProbe
 
-Minimalistická iOS companion aplikace, která **pasivně poslouchá** CGM hodnoty vysílané
-pumpou Medtrum Nano (TouchCare) přes Bluetooth Low Energy, dekóduje je a zobrazuje
-na jediné diagnostické obrazovce.
+iOS aplikace, která čte glykemii a posílá ji na hodinky Garmin.
 
-Etapa 1 = diagnostický prototyp. Nic víc.
+```
+Libre 2+ ──► oficiální Libre app ──► LibreLinkUp ──► MedProbe ──► Forerunner 165
+```
 
-> **Aktuální stav, otevřené otázky a kudy dál najdeš v [STATUS.md](STATUS.md).**
-> Dekodér je ověřený proti EasyPatch; nedořešená zůstává spolehlivost doručování.
+Zdrojem je **LibreLinkUp** (follower účet) — MedProbe čte, co oficiální aplikace nahrála,
+a senzoru se nedotýká. Podporuje i **Medtrum Nano** přes Bluetooth, ten je ale zatím skrytý.
+
+> **Aktuální stav, co je hotové a kudy dál: [STATUS.md](STATUS.md).**
+> Postup pro Garmin: [garmin/README.md](garmin/README.md).
 
 ---
 
 ## ⚠️ Co aplikace NEDĚLÁ
 
-Jde o inzulinovou pumpu, proto je rozsah aplikace záměrně tvrdě omezený.
+**Není náhrada oficiálních aplikací ani jejich alarmů.** Libre app i EasyPatch zůstávají
+tím, co vlastní senzor a pumpu; MedProbe jen čte.
+
+U **Libre** nikdy: neaktivuje senzor přes NFC, nepřebírá jeho spojení, neodemyká
+streamování, nedekóduje jeho pakety. Heartbeat listener se přihlásí k notifikaci a použije
+ji pouze jako pobídku načíst hodnotu z LibreLinkUp.
+
+U **Medtrum** je rozsah tvrdě omezený, protože jde o inzulinovou pumpu.
 MedProbe **nikdy**:
 
 - neposílá pumpě žádné příkazy

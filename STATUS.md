@@ -1,162 +1,156 @@
 # Stav projektu
 
-Zapsáno 6. 9. 2026, kdy testování skončilo kvůli ztrátě přístupu k testovacímu iPhonu.
-Slouží k tomu, aby se dalo navázat bez čtení celé historie.
+Zapsáno 10. 9. 2026. Slouží k tomu, aby se dalo navázat bez čtení celé historie.
 
-Poslední nasazená verze: **0.7.0 (build 9)**, commit `2b7ab28`.
+Nasazeno: **1.0.1 (build 20)**. 181 unit testů, CI zelené.
+
+---
+
+## Co aplikace dělá
+
+```
+Libre 2+ senzor ──► oficiální Libre app ──► LibreView ──► LibreLinkUp ──► MedProbe ──► FR165
+                                                                             │
+                                    heartbeat (BLE, read-only) ──────────────┘
+```
+
+Otevře se na glykemii: hodnota, trend, stáří. Diagnostika se zapíná v nastavení.
+
+Data odesílá do Garmin watch-app přes Connect IQ. **Ciferník zatím není** — jen aplikace,
+kterou je potřeba na hodinkách otevřít.
 
 ---
 
 ## Co je hotové a ověřené
 
-### CGM dekodér — spolehlivý
+### LibreLinkUp — funguje
 
-Dekódování paketů z `669A9141` je ověřené proti EasyPatch:
+Follower přístup: MedProbe čte, co oficiální aplikace nahrála. Nesahá na senzor.
 
-| paket | dekódováno | EasyPatch | rozdíl |
-|---|---|---|---|
-| 11:44:13 | 16,43 mmol/L | 16,4 | −0,03 |
-| 11:46:08 | 16,38 mmol/L | 16,4 | +0,02 |
-| 11:48:09 | 16,48 mmol/L | 16,5 | +0,02 |
+Tři věci, které to zpočátku blokovaly a jsou v `LibreLinkUpAPI.swift` okomentované:
 
-Odchylka je uvnitř zaokrouhlení EasyPatch na jedno desetinné místo.
+- hlavičky musí být **`llu.android`** a aktuální verze; `llu.ios` server odmítá s HTTP 403
+- posílá se i `user-agent: LibreLinkUp/4.16.0 (Android; Build 1)` — výchozí od URLSession neprojde
+- přihlášení začíná na **`api.libreview.io`** a redirect na region se **následuje**; startovat rovnou
+  na regionálním hostu znamená, že špatná volba selže jako chyba přihlášení
 
-Nezávislé strukturální potvrzení: reading counter roste přesně o 1 za cyklus, historické
-sloty fungují jako posuvný registr (první slot = current předchozího paketu), a counter
-implikuje stáří senzoru odpovídající skutečnosti.
+Zdroj: funkční Cloudflare worker uživatele (`~/Plocha/projects/glupro/worker.js`).
 
-Ty čtyři reálné pakety jsou v `MedProbeTests/MedtrumPacketDecoderTests.swift` jako testovací
-vektory — je to jediná ground truth v projektu.
+Přihlašovací údaje jsou v Keychainu, nikdy v UserDefaults ani logu.
 
-**Marker naší varianty je `0x06`**, zatímco xDrip reference dokumentuje `0x02`. Obojí je
-přijímáno, cokoli jiného se odmítá (commit `e632f2d`).
+### Heartbeat — funguje, ověřeno jako bezpečný
 
-### Protokol 669A9120 a 669A9101
+Přihlásí se k `F002` na už připojeném senzoru a použije notifikaci **jen jako pobídku**
+k načtení z LibreLinkUp. Payload nedekóduje — je šifrovaný a klíče by se musely brát ze
+senzoru. Do `F001` se nikdy nepíše; ta charakteristika se ani neobjevuje.
 
-Sémantika převzatá z AndroidAPS Medtrum driveru a ověřená dvěma nezávislými způsoby
-(commit `0f2e25c`):
+**Bez něj na pozadí nechodí nic**, protože iOS aplikaci suspenduje i s časovačem.
 
-- proti testovacím vektorům z `NotificationPacketTest.kt` toho projektu, byte za bytem
-- fyzikálně: mezi dvěma zachycenými rámci vzrostl podaný bolus přesně o tolik, o kolik
-  klesl rezervoár (2,7 U) — což vyjde jen při správných offsetech
+Ověřeno, že Libre aplikaci neruší: report v Libre za 7 dní ukázal **100 % času senzor aktivní**.
 
-Framing na `669A9101` je potvrzený AAPS CRC-8: **16 ze 16** zachycených rámců prošlo.
+Cyklus `listening=true` → `sensor disconnected` po pár sekundách je **normální** — senzor
+vysílá jednou za minutu a mezi tím spí. Není to konflikt o spojení.
 
-### Infrastruktura
+### Garmin — funguje
 
-- build a testy na GitHub Actions bez lokálního Macu (`.github/workflows/ios-build.yml`)
-- signed TestFlight distribuce (`.github/workflows/testflight.yml`), postup v README
-- 87 unit testů
-- dva CI guardy: žádná BLE write cesta, žádné commitnuté signing artefakty
+SDK je veřejný Swift package (`garmin/connectiq-companion-app-sdk-ios`), připnutý na 1.8.0.
 
-### Bezpečnost
+Watch-app se sestaví lokálním SDK, běží na FR165 a přijímá i zavřená (ServiceDelegate
+s `onPhoneAppMessage`).
 
-**Zero pump command writes** po celou dobu, ověřováno CI na každém commitu. Jediná
-write-like operace je `setNotifyValue`, tedy standardní GATT subscription.
+### Medtrum — funkční, skrytý
 
----
+Dekodér ověřený proti EasyPatch, testy nedotčené. Skrytý z UI, protože pumpa vysílá jen
+v ~5minutových oknech, zhruba dvě čtení za hodinu. Vrátit ho = smazat filtr
+v `SelectedSource.selectable`.
 
-## Hlavní otevřená otázka
-
-**Z `669A9141` dostáváme zhruba 8 % čtení.**
-
-Napočítáno podle counteru napříč záznamy z 5. 9. 2026:
-
-```
-counter 5405 → 5534 = 129 cyklů (4,3 hodiny)
-senzor vygeneroval : 130 čtení
-zachyceno          : 10
-úspěšnost          : 7,7 %
-```
-
-Data přicházejí jen v oknech, kdy je první bajt CGM pole v `669A9120` roven `0x03`.
-Okno trvá kolem pěti minut a vejdou se do něj právě dva CGM cykly. Mezi okny bylo
-naměřeno 128, 58 a 70 minut.
-
-Pozorováno pětkrát nezávisle, včetně jednoho negativního případu: v běhu 6. 9. se stav
-za 1 hodinu 38 minut nikdy nedostal na `0x03` a nepřišel ani jeden paket.
-
-### Proč to nejspíš není chyba v našem kódu
-
-- délky oken jsou **konzistentní** (vždy dva pakety), zaseknutý GATT by dával náhodné délky
-- heartbeat na `669A9120` běžel dál na tomtéž peripheral objektu i deset minut po posledním
-  CGM paketu — callback path, delegate i subscription byly prokazatelně živé
-- audit vyloučil vícenásobné instance manageru: vzniká jednou jako `let` na `AppDelegate`,
-  `CBCentralManager` za `guard centralManager == nil`, ContentView drží vše jako
-  `@ObservedObject`, takže překreslení view nemůže nic zkonstruovat znovu
-
-### Nejsilnější hypotéza
-
-Odlišná firmware varianta. xDrip na hardwaru s markerem `0x02` hlásí kontinuální příjem
-každé dvě minuty (PR #718 toho projektu, ověřeno na 9+ párovaných vzorcích). Naše varianta
-má marker `0x06` a kalibrační faktor 1037, zatímco xDrip dokumentuje 8932 a 10333 — řádově
-jinde. Veřejný zdroj mapující `0x06` na konkrétní firmware se najít nepodařilo.
-
-Alternativa, kterou data nerozliší: pumpa nebo EasyPatch pouští druhého klienta jen v oknech.
+Podrobnosti k tomu, co se o Medtrum protokolu zjistilo, jsou v historii commitů kolem
+`0f2e25c` a `e632f2d`.
 
 ---
 
-## Nedokončený test
+## Věci, které stály nejvíc času
 
-Dvouhodinový diagnostický běh měl změřit, kolik oken se otevře a co jim předchází na
-`669A9101`. Proběhl 6. 9., ale ten den došel inzulin a **vyměnila se patch pumpa** — senzor
-nebyl navázaný, kalibrační faktor 1037 z dat úplně zmizel a stav se držel na `0x01`/`0x02`.
-Test tedy odpověď nedal a je potřeba ho zopakovat s navázaným senzorem.
+Zapsané proto, že se na ně nedá přijít čtením kódu.
+
+**Timer na pozadí neběží.** `asyncAfter` naplánovaný před suspendací se nespustí. Způsobilo
+to 25minutovou díru: heartbeat spadl, retry čekal na časovač, a ten mohl vystřelit až
+poté, co aplikaci probudilo něco jiného. Řešení je **čekající `connect()`** — ten
+suspendaci přežije a iOS aplikaci probudí. Platí pro Libre i Medtrum.
+
+**Connect IQ app id není UUID.** Manifest ho píše jako 32 hex znaků, Foundation chce
+`8-4-4-4-12`. `UUID(uuidString:)` vrátí nil, `IQApp` to bez námitek přijme a adresuje
+prázdno — projeví se to jako timeout (result 8) o několik sekund později. Převod je
+v `ConnectIQAppID`.
+
+**Connect IQ nedovolí jednu aplikaci jako watch-app i ciferník.** Musí to být dva projekty.
+
+**SDK neukládá spárovaná zařízení.** Žádné `retrieveSavedDevices` neexistuje — ukládáme si
+uuid, model a jméno sami, jinak se páruje po každém spuštění.
+
+**JSONEncoder `.iso8601` zahazuje milisekundy.** Každý capture měl `.000Z`, a test to
+nechytil, protože používal kulatý timestamp.
 
 ---
 
 ## Kudy dál
 
-1. **Zopakovat dvouhodinový diagnostický běh** s navázaným senzorem. Otázky: kolik oken,
-   jak dlouhá, a jestli jim něco na `669A9101` předchází.
+1. **Ciferník** — samostatný Connect IQ projekt, čte hodnotu přes complication. Bez něj se
+   musíš na hodinkách proklikat do aplikace. Nejbližší smysluplný kus.
+2. **Data field pro aktivity** — glykemie během běhu. Sdílel by `GlucoseReading.mc`
+   a `Formatter.mc`.
+3. **FR255** — chybí definice zařízení v SDK manageru; manifest i jungle mají zakomentované
+   řádky připravené, resources hotové.
+4. **Přeformulovat `sensor disconnected`** na něco jako `sleeping between transmissions` —
+   vypadá to jako chyba, přitom je to normální stav.
+5. Medtrum okna — proč pumpa vysílá jen občas, zůstalo nedořešené.
 
-2. **Ověřit `28 41` zprávy na 669A9101.** V záznamu z 13:49:32 nesla taková zpráva kompletní
-   CGM paket — raw hodnota z ní byla přesně první historický slot následujícího 9141 paketu
-   a celá historie posunutá o jeden cyklus. Jeden vzorek, ale strukturálně přesvědčivý.
-   Pokud takové zprávy chodí pravidelně, je to použitelný druhý zdroj glykemie.
+---
 
-3. **Zneplatnit uložený peripheral identifier po výměně pumpy.** Nová pumpa má nové BLE UUID,
-   ale `medtrum.peripheralIdentifier` v UserDefaults zůstává od staré a sám se nezneplatní.
-   Fallback na `retrieveConnectedPeripherals` zafungoval, takže to zatím neškodí — ale je to
-   slabé místo.
+## Právní poznámka
 
-4. **Ukládat peripheral UUID do capture souboru.** Z CSV dnes nelze ověřit, ke které pumpě
-   jsme byli připojeni. Po výměně patche to chybělo.
+Distribuce zatím **interní TestFlight**. Externí vyžaduje Beta App Review a tam přijde
+otázka, jestli jde o zdravotnický prostředek — v EU podle MDR software poskytující data
+pro rozhodování o léčbě obvykle ano, třída IIa.
 
-5. **Ověřit přežití na pozadí.** `bluetooth-central` a state restoration jsou nastavené, ale
-   nikdy se neprokázalo, že se aplikace po ukončení systémem vrátí. Jednou byla nalezena
-   ukončená po ~38 minutách ticha.
+Nightscout, xDrip, AndroidAPS ani Loop nejsou v obchodech: distribuují zdrojový kód
+a uživatel si aplikaci staví sám. Je to promyšlené obcházení právě tohoto.
+
+LibreLinkUp je navíc nedokumentované API; pro osobní použití to nikdo neřeší, u veřejné
+distribuce je to jiná situace.
 
 ---
 
 ## Poznámky k nástrojům
 
-**Listening mode** (0.7.0, commit `2b7ab28`) přepíná, k čemu se aplikace přihlašuje:
+**Connect IQ SDK** je lokálně v `~/.Garmin/ConnectIQ/Sdks/connectiq-sdk-lin-9.2.0`,
+definice zařízení zatím jen pro fr165. Build:
 
-- `xDrip parity` — pouze `669A9141`, jako upstream. Záměrně slepý: bez `669A9120` nelze
-  odlišit ticho způsobené naší chybou od pumpy, která nevysílá.
-- `production` — `669A9141` + `669A9120` (výchozí)
-- `diagnostic` — navíc `669A9101`, jediný režim, který vidí fragmentovaný stream
+```bash
+export PATH="$HOME/.Garmin/ConnectIQ/Sdks/connectiq-sdk-lin-9.2.0/bin:$PATH"
+monkeyc -f garmin/MedProbeWatch/monkey.jungle -d fr165 \
+        -o MedProbe.prg -y ~/Stažené/MedProbe-garmin/developer_key.der -w
+```
 
-**Capture** se zapisuje průběžně do `Documents/medprobe-capture.jsonl`, řádek po řádku, a je
-dostupný i z Files.app. Export do CSV má sloupce `timestamp,characteristic,length,hex`
-s milisekundami. Ručně označené hodnoty z EasyPatch jsou ve stejném souboru pod
-`EASYPATCH_MMOL_L` a aplikace je nikdy nečte zpět.
+Klíč `developer_key.der` musí zůstat stejný, jinak hodinky berou build jako jinou aplikaci.
 
-**Watchdog** recykluje spojení po sedmi minutách bez platného CGM paketu, ale jen když stav
-dovoluje vysílání — mimo okno by reconnect nic nespravil a jen by zatěžoval spojení sdílené
-s EasyPatch (commit `f763e80`).
+Nahrání do hodinek: `cp` přes MTP nefunguje, `gio copy` ano.
+
+```bash
+gio copy MedProbe.prg "mtp://<id>/Internal Storage/GARMIN/Apps/MedProbe.prg"
+```
+
+**CI** nebudí macOS runner na změny v `garmin/` ani v dokumentaci — ten je desetkrát dražší
+než Linux. Garmin kontroly jsou v `.github/scripts/garmin-checks.sh` a jdou spustit lokálně.
+
+**Plný Connect IQ build v CI nejde** — SDK archiv neobsahuje definice zařízení a SDK manager
+nemá CLI.
 
 ---
 
 ## Reference
 
-- `JohanDegraeve/xdripswift` — `CGMMedtrumTouchCareNanoTransmitter.swift`, PR #718,
-  commit `06da42cf` (background recovery: watchdog 7 min, backoff 5/10/15 s)
-- `nightscout/AndroidAPS` — `pump/medtrum/`, zejména `NotificationPacket.kt`,
-  `ReadDataPacket.kt`, `CrcUtil.kt` a jejich unit testy
-- `Artificial-Pancreas/MedtrumKit` — pouze BLE lifecycle principy, nic z pump-control vrstvy
-
-Pole, které AndroidAPS nazývá `MASK_UNUSED_CGM`, ten projekt vědomě nedekóduje. U nás se
-mění jen jeho první bajt a s glykemií nekoreluje — jako zdroj glukózy je to slepá ulička,
-ale právě ten bajt je zatím jediný předvídatel provozu na `669A9141`.
+- `JohanDegraeve/xdripswift` — Medtrum CGM formát, watchdog a backoff
+- `nightscout/AndroidAPS` — `pump/medtrum/`, notification packet a CRC-8
+- `robberwick/pylibrelinkup` — funkční LibreLinkUp hlavičky
+- `garmin/connectiq-companion-app-sdk-ios` — iOS SDK jako Swift package
