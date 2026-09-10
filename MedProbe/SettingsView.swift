@@ -15,8 +15,13 @@ struct SettingsView: View {
     @ObservedObject var coordinator: GlucoseCoordinator
     let credentials: LibreCredentials
 
-    @AppStorage(SelectedSource.storageKey) private var selectedSource = SelectedSource.medtrum.rawValue
+    @AppStorage(SelectedSource.storageKey) private var selectedSource = SelectedSource.defaultSource.rawValue
     @AppStorage(LibreHeartbeatListener.enabledKey) private var heartbeatEnabled = false
+
+    /// Advanced switches, all off by default.
+    @AppStorage(MedProbeConstants.showDiagnosticsKey) private var showDiagnostics = false
+    @AppStorage(MedProbeConstants.diagnosticModeKey) private var diagnosticMode = false
+    @AppStorage(ListeningMode.storageKey) private var listeningMode = ListeningMode.production.rawValue
 
     @State private var email = ""
     @State private var password = ""
@@ -32,6 +37,7 @@ struct SettingsView: View {
                 libreSection
                 watchSection
                 activitySection
+                advancedSection
             }
             .navigationTitle("Settings")
             .onAppear(perform: loadStoredCredentials)
@@ -42,14 +48,16 @@ struct SettingsView: View {
 
     private var sourceSection: some View {
         Section("Glucose source") {
-            Picker("Source", selection: $selectedSource) {
-                ForEach(SelectedSource.allCases) { source in
-                    Text(source.displayName).tag(source.rawValue)
+            if SelectedSource.hasChoice {
+                Picker("Source", selection: $selectedSource) {
+                    ForEach(SelectedSource.selectable) { source in
+                        Text(source.displayName).tag(source.rawValue)
+                    }
                 }
-            }
-            .onChange(of: selectedSource) { _, newValue in
-                guard let source = SelectedSource(rawValue: newValue) else { return }
-                coordinator.select(source)
+                .onChange(of: selectedSource) { _, newValue in
+                    guard let source = SelectedSource(rawValue: newValue) else { return }
+                    coordinator.select(source)
+                }
             }
 
             LabeledContent("Status") {
@@ -244,6 +252,46 @@ struct SettingsView: View {
     }
 
     // MARK: - activity
+
+    private var advancedSection: some View {
+        Section("Advanced") {
+            Toggle(isOn: $showDiagnostics) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Show diagnostics")
+                    Text("Adds a tab with the raw Bluetooth log. Useful when something is wrong.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if showDiagnostics {
+                Toggle(isOn: $diagnosticMode) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Show therapy fields")
+                        Text("Also decodes insulin delivery and alarm fields from the pump. MedProbe is a glucose reader; these are off by default.")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Listening mode")
+                        .font(.caption.weight(.semibold))
+                    Picker("Listening mode", selection: $listeningMode) {
+                        ForEach(ListeningMode.allCases) { mode in
+                            Text(mode.title).tag(mode.rawValue)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    Text(ListeningMode(rawValue: listeningMode)?.explanation ?? "")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 2)
+            }
+        }
+    }
 
     private var activitySection: some View {
         Section("Activity") {

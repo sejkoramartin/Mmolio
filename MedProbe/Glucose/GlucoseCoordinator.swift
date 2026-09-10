@@ -18,6 +18,17 @@ enum SelectedSource: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    /// Sources offered in the interface.
+    ///
+    /// Medtrum works and its code is untouched, but its pump only transmits in short
+    /// windows — roughly two readings an hour — which is not something to present as a
+    /// choice alongside one that updates every minute. It stays out of the picker until
+    /// that is solved; adding it back is deleting the filter below.
+    static var selectable: [SelectedSource] { [.libreLinkUp] }
+
+    /// Whether the picker is worth showing at all.
+    static var hasChoice: Bool { selectable.count > 1 }
+
     var kind: GlucoseSourceKind {
         switch self {
         case .medtrum: return .medtrum
@@ -31,9 +42,14 @@ enum SelectedSource: String, CaseIterable, Identifiable {
 
     static var current: SelectedSource {
         guard let raw = UserDefaults.standard.string(forKey: storageKey),
-              let value = SelectedSource(rawValue: raw) else { return .medtrum }
-        return value
+              let value = SelectedSource(rawValue: raw) else { return defaultSource }
+
+        // A stored source that is no longer offered would leave the app on something the
+        // user cannot see or change.
+        return selectable.contains(value) ? value : defaultSource
     }
+
+    static var defaultSource: SelectedSource { selectable.first ?? .libreLinkUp }
 }
 
 /// Connects the selected source to the Garmin transport.

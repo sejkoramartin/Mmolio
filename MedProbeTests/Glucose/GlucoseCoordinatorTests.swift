@@ -159,3 +159,42 @@ final class GlucoseCoordinatorTests: XCTestCase {
         XCTAssertEqual(SelectedSource.libreLinkUp.kind, .libreLinkUp)
     }
 }
+
+// MARK: - which sources the interface offers
+//
+// Medtrum works and its code is untouched, but its pump transmits in short windows —
+// about two readings an hour — so offering it beside one that updates every minute would
+// be presenting a choice that is not really a choice. It is filtered out of the picker.
+
+extension GlucoseCoordinatorTests {
+
+    func testOnlyLibreIsOfferedForNow() {
+        XCTAssertEqual(SelectedSource.selectable, [.libreLinkUp])
+        XCTAssertFalse(SelectedSource.hasChoice, "one option is not a choice worth showing")
+    }
+
+    func testMedtrumRemainsFullySupportedEvenWhileHidden() {
+        // Hidden from the picker, not removed: the case, its kind and its wire value all
+        // still work, so a stored reading or an old message still makes sense.
+        XCTAssertTrue(SelectedSource.allCases.contains(.medtrum))
+        XCTAssertEqual(SelectedSource.medtrum.kind, .medtrum)
+        XCTAssertEqual(GlucoseSourceKind.medtrum.wireValue, 1)
+    }
+
+    func testTheDefaultIsSomethingTheUserCanSee() {
+        XCTAssertTrue(SelectedSource.selectable.contains(SelectedSource.defaultSource))
+    }
+
+    func testAStoredSourceThatIsNoLongerOfferedFallsBack() {
+        let defaults = UserDefaults.standard
+        let previous = defaults.string(forKey: SelectedSource.storageKey)
+        defer { defaults.set(previous, forKey: SelectedSource.storageKey) }
+
+        // Someone who selected Medtrum in an earlier build must not be left on a source
+        // the interface no longer shows and they cannot change.
+        defaults.set(SelectedSource.medtrum.rawValue, forKey: SelectedSource.storageKey)
+
+        XCTAssertEqual(SelectedSource.current, SelectedSource.defaultSource)
+        XCTAssertTrue(SelectedSource.selectable.contains(SelectedSource.current))
+    }
+}

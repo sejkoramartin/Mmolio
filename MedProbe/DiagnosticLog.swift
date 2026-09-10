@@ -101,6 +101,10 @@ enum MedProbeConstants {
     /// unless this is deliberately switched on.
     static let diagnosticModeKey = "diagnosticMode"
 
+    /// Whether the diagnostics tab is shown. Off by default: it is a tool for finding
+    /// problems, not something to meet on opening the app.
+    static let showDiagnosticsKey = "medprobe.showDiagnostics"
+
     /// Whether therapy values may currently be displayed and logged. Off by default.
     static var isDiagnosticModeEnabled: Bool {
         UserDefaults.standard.bool(forKey: diagnosticModeKey)

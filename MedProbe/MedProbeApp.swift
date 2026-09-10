@@ -57,20 +57,47 @@ struct MedProbeApp: App {
 
     var body: some Scene {
         WindowGroup {
-            TabView {
-                ContentView(bluetoothManager: appDelegate.bluetoothManager)
-                    .tabItem { Label("Diagnostics", systemImage: "waveform.path.ecg") }
-
-                SettingsView(coordinator: appDelegate.coordinator,
-                             credentials: appDelegate.credentials)
-                    .tabItem { Label("Settings", systemImage: "gearshape") }
-            }
+            RootView(appDelegate: appDelegate)
             // Garmin Connect hands control back through the medprobe:// scheme after the
             // user picks their watches. Without this the selection completes on their
             // side and never reaches us, so no watch ever appears.
             .onOpenURL { url in
                 appDelegate.coordinator.handleGarminReturn(from: url)
             }
+        }
+    }
+}
+
+/// Chooses what the app leads with.
+///
+/// Glucose first. Diagnostics is still reachable — it is how every problem so far has
+/// been found — but it is a tool, not the front page, so it appears only when switched on
+/// in settings.
+struct RootView: View {
+
+    let appDelegate: AppDelegate
+
+    @AppStorage(MedProbeConstants.showDiagnosticsKey) private var showDiagnostics = false
+
+    var body: some View {
+        TabView {
+            GlucoseView(coordinator: appDelegate.coordinator)
+                .tabItem { Label("Glucose", systemImage: "drop.fill") }
+
+            SettingsView(coordinator: appDelegate.coordinator,
+                         credentials: appDelegate.credentials)
+                .tabItem { Label("Settings", systemImage: "gearshape") }
+
+            if showDiagnostics {
+                ContentView(bluetoothManager: appDelegate.bluetoothManager)
+                    .tabItem { Label("Diagnostics", systemImage: "waveform.path.ecg") }
+            }
+        }
+        // Garmin Connect hands control back through the medprobe:// scheme after the user
+        // picks their watches. Without this the selection completes on their side and
+        // never reaches us, so no watch ever appears.
+        .onOpenURL { url in
+            appDelegate.coordinator.handleGarminReturn(from: url)
         }
     }
 }
