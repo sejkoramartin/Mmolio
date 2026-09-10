@@ -73,9 +73,12 @@ final class LibreHeartbeatListener: NSObject {
     private(set) var heartbeatCount = 0
     private(set) var lastHeartbeatAt: Date?
 
-    /// A sensor dropping and coming back is ordinary. Retrying is therefore necessary —
-    /// but slowly and with a ceiling, because the link belongs to the Libre app and a
-    /// listener that grabs at it repeatedly is exactly the interference to avoid.
+    /// Backoff for the case where attaching fails outright — no sensor connected yet, or
+    /// the connect attempt was refused. A plain disconnect does not use this: it leaves a
+    /// pending connect with CoreBluetooth instead, which works while suspended.
+    ///
+    /// Bounded because the link belongs to the Libre app, and a listener that grabs at it
+    /// repeatedly is exactly the interference to avoid.
     private static let reattachDelays: [TimeInterval] = [30, 60, 120, 300]
     private var reattachAttempt = 0
     private var reattachGeneration = 0
@@ -121,6 +124,10 @@ final class LibreHeartbeatListener: NSObject {
         guard central != nil else { return }
 
         if let peripheral, let central {
+            // Cancel any outstanding connect, or iOS keeps waking the app on behalf of a
+            // listener the user has switched off.
+            central.cancelPeripheralConnection(peripheral)
+
             // Unsubscribe before letting go, so nothing is left enabled on a link the
             // official app owns.
             if let characteristic = peripheral.services?
@@ -202,14 +209,28 @@ extension LibreHeartbeatListener: CBCentralManagerDelegate {
                         didDisconnectPeripheral peripheral: CBPeripheral,
                         error: Error?) {
         isListening = false
-        log.info("Libre heartbeat: sensor disconnected; polling continues while we retry", .ble)
-        scheduleReattach(using: central)
+        log.info("Libre heartbeat: sensor disconnected", .ble)
+
+        // Ask CoreBluetooth to reconnect and leave the request outstanding. Unlike a
+        // timer, a pending connect survives suspension: iOS holds it and wakes the app
+        // when the sensor is reachable again.
+        //
+        // This matters more than it looks. A timer-based retry cannot run while the app
+        // is suspended, and with the heartbeat down there is nothing else to wake it —
+        // so the app sleeps until something else happens to open it. That produced a
+        // 25-minute gap with no log lines at all.
+        self.peripheral = peripheral
+        peripheral.delegate = self
+        central.connect(peripheral, options: nil)
+        log.info("Libre heartbeat: reconnect requested; iOS will wake us when the sensor returns", .ble)
     }
 
     func centralManager(_ central: CBCentralManager,
                         didFailToConnect peripheral: CBPeripheral,
                         error: Error?) {
         log.info("Libre heartbeat: could not attach; polling continues normally", .ble)
+        // A failed attempt is different from a disconnect: the pending-connect trick does
+        // not apply, so back off and try again from the top.
         scheduleReattach(using: central)
     }
 

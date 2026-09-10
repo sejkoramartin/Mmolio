@@ -257,6 +257,19 @@ final class MedtrumBluetoothManager: NSObject, ObservableObject {
         lastReconnectAt = Date()
         log.info("Reconnect #\(reconnectPolicy.attempt) in \(Int(delay))s — \(reason.rawValue)", .ble)
 
+        // A pending connect alongside the timer. The timer cannot fire while iOS has the
+        // app suspended, and with nothing else arriving there is nothing to wake it —
+        // whereas an outstanding connect request survives suspension and iOS delivers
+        // didConnect when the pump is reachable. Belt and braces: whichever happens
+        // first, connect(to:) is idempotent enough that the other becomes a no-op.
+        if let peripheral = knownPeripheral(using: central), peripheral.state == .disconnected {
+            peripheral.delegate = self
+            central.connect(peripheral, options: [
+                CBConnectPeripheralOptionNotifyOnConnectionKey: true,
+                CBConnectPeripheralOptionNotifyOnDisconnectionKey: true
+            ])
+        }
+
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
             guard let self, self.reconnectGeneration == generation else { return }
             guard central.state == .poweredOn else {

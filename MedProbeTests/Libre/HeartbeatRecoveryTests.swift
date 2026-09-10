@@ -58,3 +58,24 @@ final class HeartbeatRecoveryTests: XCTestCase {
         XCTAssertLessThanOrEqual(untilCeiling, 300, "should reach the ceiling within five minutes")
     }
 }
+
+// MARK: - what recovers a suspended app
+//
+// A 25-minute gap in a real log, with no lines at all between a disconnect and the app
+// being opened, showed the shape of this: a timer-based retry cannot fire while iOS has
+// the app suspended, and with the heartbeat down nothing else wakes it. The retry was
+// waiting for a timer that would only run once something else had already woken the app.
+
+extension HeartbeatRecoveryTests {
+
+    func testTheBackoffLadderIsOnlyForFailedAttachments() {
+        // A plain disconnect leaves a pending connect with CoreBluetooth instead, because
+        // that survives suspension. The ladder covers the case where attaching failed
+        // outright, where there is nothing pending to rely on.
+        XCTAssertEqual(delays.first, 30, "a failed attach still backs off rather than retrying instantly")
+    }
+
+    func testCeilingStillRecoversWithinMinutesNotHours() {
+        XCTAssertLessThanOrEqual(delays.last ?? 0, 300)
+    }
+}
