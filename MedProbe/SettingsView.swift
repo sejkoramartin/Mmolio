@@ -134,6 +134,10 @@ struct SettingsView: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
 
+            Text("iOS suspends apps in the background, so scheduled polling stops when MedProbe is not on screen. Faster Libre updates keeps it going: a sensor notification wakes the app long enough to fetch and send.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
             heartbeatToggle
         }
     }

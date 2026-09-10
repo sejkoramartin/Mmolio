@@ -54,6 +54,10 @@ final class LibreHeartbeatListener: NSObject {
     /// name and so a reader can see it was considered. Nothing in this file writes to it.
     static let excludedCharacteristicUUID = CBUUID(string: "F001")
 
+    /// CoreBluetooth state restoration identifier. Distinct from the Medtrum one: two
+    /// central managers in one app must not share it.
+    static let restoreIdentifier = "cz.sejkora.MedProbe.libreHeartbeat"
+
     /// Feature flag key. Off unless the user deliberately turns it on.
     static let enabledKey = "medprobe.libreHeartbeatEnabled"
 
@@ -68,6 +72,13 @@ final class LibreHeartbeatListener: NSObject {
     private(set) var isListening = false
     private(set) var heartbeatCount = 0
     private(set) var lastHeartbeatAt: Date?
+
+    /// A sensor dropping and coming back is ordinary. Retrying is therefore necessary —
+    /// but slowly and with a ceiling, because the link belongs to the Libre app and a
+    /// listener that grabs at it repeatedly is exactly the interference to avoid.
+    private static let reattachDelays: [TimeInterval] = [30, 60, 120, 300]
+    private var reattachAttempt = 0
+    private var reattachGeneration = 0
 
     private let log: DiagnosticLog
     private var central: CBCentralManager?
@@ -88,9 +99,19 @@ final class LibreHeartbeatListener: NSObject {
         guard central == nil else { return }
 
         log.info("Libre heartbeat: starting (experimental, read-only)", .ble)
-        // No restore identifier: this listener is an optimisation and must never cause
-        // the app to be relaunched in the background on its own account.
-        central = CBCentralManager(delegate: self, queue: nil)
+
+        // The restore identifier is what lets iOS deliver these notifications to a
+        // suspended app, and relaunch it if the app was terminated. Without it the
+        // listener works only while MedProbe is on screen — which defeats the point,
+        // since the whole reason it exists is to keep the watch current while the phone
+        // is in a pocket.
+        //
+        // It still only ever subscribes, and it still falls back silently to polling.
+        central = CBCentralManager(
+            delegate: self,
+            queue: nil,
+            options: [CBCentralManagerOptionRestoreIdentifierKey: Self.restoreIdentifier]
+        )
     }
 
     func stop() {
@@ -115,6 +136,9 @@ final class LibreHeartbeatListener: NSObject {
         peripheral = nil
         central = nil
         isListening = false
+        // Invalidate any pending retry, or a stopped listener quietly comes back.
+        reattachGeneration += 1
+        reattachAttempt = 0
         log.info("Libre heartbeat: stopped", .ble)
     }
 
@@ -148,7 +172,25 @@ extension LibreHeartbeatListener: CBCentralManagerDelegate {
 
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
         guard central.state == .poweredOn else { return }
+
+        // A restored peripheral is already connected; carry on from there rather than
+        // looking for it again.
+        if let peripheral, peripheral.state == .connected {
+            peripheral.delegate = self
+            self.centralManager(central, didConnect: peripheral)
+            return
+        }
+
         attachToConnectedSensor(central)
+    }
+
+    func centralManager(_ central: CBCentralManager, willRestoreState dict: [String: Any]) {
+        let restored = dict[CBCentralManagerRestoredStatePeripheralsKey] as? [CBPeripheral] ?? []
+        guard let sensor = restored.first else { return }
+
+        log.info("Libre heartbeat: restored by iOS", .ble)
+        peripheral = sensor
+        sensor.delegate = self
     }
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
@@ -160,15 +202,39 @@ extension LibreHeartbeatListener: CBCentralManagerDelegate {
                         didDisconnectPeripheral peripheral: CBPeripheral,
                         error: Error?) {
         isListening = false
-        // No reconnect loop: the official app owns this link, and a listener that keeps
-        // grabbing at it would be exactly the interference this must avoid.
-        log.info("Libre heartbeat: sensor disconnected; falling back to polling", .ble)
+        log.info("Libre heartbeat: sensor disconnected; polling continues while we retry", .ble)
+        scheduleReattach(using: central)
     }
 
     func centralManager(_ central: CBCentralManager,
                         didFailToConnect peripheral: CBPeripheral,
                         error: Error?) {
         log.info("Libre heartbeat: could not attach; polling continues normally", .ble)
+        scheduleReattach(using: central)
+    }
+
+    /// Tries again later, backing off and eventually settling at five minutes.
+    ///
+    /// Unbounded retrying would be interference; never retrying means one ordinary sensor
+    /// dropout ends the heartbeat for good, which is what happened overnight — five hours
+    /// with nothing but a poll timer that a suspended app never runs.
+    private func scheduleReattach(using central: CBCentralManager) {
+        guard Self.isEnabled else { return }
+
+        let delay = Self.reattachDelays[min(reattachAttempt, Self.reattachDelays.count - 1)]
+        reattachAttempt += 1
+        reattachGeneration += 1
+        let generation = reattachGeneration
+
+        log.info("Libre heartbeat: retrying in \(Int(delay))s", .ble)
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            guard let self, self.reattachGeneration == generation else { return }
+            guard Self.isEnabled, central.state == .poweredOn else { return }
+            guard !self.isListening else { return }
+
+            self.attachToConnectedSensor(central)
+        }
     }
 }
 
@@ -208,6 +274,9 @@ extension LibreHeartbeatListener: CBPeripheralDelegate {
             return
         }
         isListening = characteristic.isNotifying
+        if isListening {
+            reattachAttempt = 0
+        }
         log.info("Libre heartbeat: listening=\(isListening)", .ble)
     }
 
@@ -220,6 +289,14 @@ extension LibreHeartbeatListener: CBPeripheralDelegate {
         // is no path by which it could become a glucose value.
         heartbeatCount += 1
         lastHeartbeatAt = Date()
+
+        // The callback starts a network fetch. Hold background time across it, or a
+        // wake-up in the user's pocket is cut off before it achieves anything.
+        let work = BackgroundWork("Libre heartbeat", log: log)
+        work.begin()
         onHeartbeat?(Date())
+        // The fetch takes its own background assertion; this one only has to cover
+        // handing the work over.
+        work.end()
     }
 }

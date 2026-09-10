@@ -157,8 +157,16 @@ final class GlucoseCoordinator: ObservableObject {
     private func handle(_ reading: GlucoseReading) {
         latestReading = reading
 
+        // Delivery to the watch goes over Bluetooth and takes a moment. If the app is in
+        // the background — which is most of the time, since nobody watches this screen —
+        // it needs to stay awake until the send completes or fails.
+        let work = BackgroundWork("Send to watch", log: log)
+        work.begin()
+
         transport.send(reading) { [weak self] result in
             DispatchQueue.main.async {
+                defer { work.end() }
+
                 switch result {
                 case .success:
                     self?.lastSentAt = Date()

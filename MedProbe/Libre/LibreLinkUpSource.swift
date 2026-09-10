@@ -113,7 +113,10 @@ final class LibreLinkUpSource: CGMSource {
         isFetching = true
         lastFetchAttempt = Date()
 
-        Task { [weak self] in
+        // Ask for time before starting. A fetch that is cut off halfway is worse than one
+        // that never began: the reading arrives, the watch never hears about it, and the
+        // send policy has already recorded it as delivered.
+        BackgroundWork.run("Libre fetch", log: log) { [weak self] in
             guard let self else { return }
             await self.performFetch(reason: reason, allowReauthentication: true)
             await MainActor.run { self.isFetching = false }
