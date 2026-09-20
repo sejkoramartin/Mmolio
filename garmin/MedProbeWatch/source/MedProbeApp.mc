@@ -41,6 +41,7 @@ module MedProbe {
             }
 
             if (GlucoseStore.accept(reading)) {
+                GlucoseComplication.publish(reading);
                 WatchUi.requestUpdate();
             }
         }
