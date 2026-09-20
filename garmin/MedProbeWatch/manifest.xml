@@ -31,6 +31,8 @@
             <iq:uses-permission id="Communications"/>
             <!-- Receiving readings while the app is closed, via MedProbeServiceDelegate. -->
             <iq:uses-permission id="Background"/>
+            <!-- Publishes the newest glucose value for a companion watch face. -->
+            <iq:uses-permission id="ComplicationPublisher"/>
         </iq:permissions>
 
         <iq:languages>
