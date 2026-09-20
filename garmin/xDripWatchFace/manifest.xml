@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<iq:manifest xmlns:iq="http://www.garmin.com/xml/connectiq" version="3">
+    <iq:application
+        id="b1c2d3e4f5a647589a0b1c2d3e4f5072"
+        type="watch-face"
+        name="@Strings.AppName"
+        entry="xDripFace.xDripWatchFaceApp"
+        launcherIcon="@Drawables.LauncherIcon"
+        minApiLevel="4.2.0">
+
+        <iq:products>
+            <iq:product id="fr165"/>
+        </iq:products>
+
+        <iq:permissions>
+            <iq:uses-permission id="ComplicationSubscriber"/>
+        </iq:permissions>
+
+        <iq:languages>
+            <iq:language>eng</iq:language>
+        </iq:languages>
+    </iq:application>
+</iq:manifest>
