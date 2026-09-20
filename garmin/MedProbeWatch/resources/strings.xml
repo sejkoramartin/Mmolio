@@ -1,5 +1,8 @@
 <strings>
     <string id="AppName">MedProbe</string>
+    <string id="GlucoseComplicationLongLabel">CGM Glucose</string>
+    <string id="GlucoseComplicationShortLabel">CGM</string>
+    <string id="GlucoseComplicationName">Glucose</string>
     <string id="UseMmolTitle">Show mmol/L</string>
     <string id="UseMmolPrompt">Off shows mg/dL instead.</string>
     <string id="StaleMinutesTitle">Mark stale after</string>
