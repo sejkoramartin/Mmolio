@@ -99,7 +99,12 @@ module MedProbe {
             if (reading == null) {
                 return "";
             }
-            return reading.source == 2 ? "Libre" : "Medtrum";
+            switch (reading.source) {
+                case 1: return "Medtrum";
+                case 2: return "Libre";
+                case 3: return "xDrip";
+                default: return "CGM";
+            }
         }
     }
 }
