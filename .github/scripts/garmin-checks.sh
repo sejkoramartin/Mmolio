@@ -7,6 +7,7 @@
 set -euo pipefail
 
 root=garmin/MedProbeWatch
+face=garmin/xDripWatchFace
 
 echo "=== project structure ==="
 for required in \
@@ -21,6 +22,15 @@ for required in \
   "$root/resources-fr165/layouts.xml"; do
   test -f "$required" || { echo "::error::missing $required"; exit 1; }
 done
+for required in \
+  "$face/manifest.xml" \
+  "$face/monkey.jungle" \
+  "$face/source/xDripWatchFaceApp.mc" \
+  "$face/source/xDripWatchFaceView.mc" \
+  "$face/resources/strings.xml" \
+  "$face/resources/drawables.xml"; do
+  test -f "$required" || { echo "::error::missing $required"; exit 1; }
+done
 echo "OK: every expected file is present."
 
 echo
@@ -28,7 +38,7 @@ echo "=== XML well-formedness ==="
 python3 - <<'PYEOF'
 import glob, sys, xml.etree.ElementTree as ET
 failed = False
-for path in sorted(glob.glob("garmin/MedProbeWatch/**/*.xml", recursive=True)):
+for path in sorted(glob.glob("garmin/**/*.xml", recursive=True)):
     try:
         ET.parse(path)
         print(f"  ok   {path}")
