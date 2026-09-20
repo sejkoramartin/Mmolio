@@ -37,7 +37,9 @@ module MedProbe {
                 return;
             }
 
-            GlucoseStore.accept(reading);
+            if (GlucoseStore.accept(reading)) {
+                GlucoseComplication.publish(reading);
+            }
 
             // Ending the background process explicitly returns the memory rather than
             // waiting to be terminated.
