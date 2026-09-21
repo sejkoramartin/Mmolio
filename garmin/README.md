@@ -135,9 +135,14 @@ přenos ani doručování mezi dvěma současně nainstalovanými aplikacemi.
 - Oba release buildy pro FR165: **BUILD SUCCESSFUL**, SDK 9.2.0, `-l 2 -r`.
 - Oba buildy s Monkey C testy: **BUILD SUCCESSFUL**, SDK 9.2.0, `-l 2 -t`.
 - Existující `.github/scripts/garmin-checks.sh`, syntaxe build skriptu a `git diff --check`: prošly.
-- **Běh testů ani vizuální kontrola v simulátoru nebyly dokončené.** Simulátor narazil
-  na starý zámek a následně chybu oprávnění pracovního sandboxu. Kompilace testů není
-  totéž jako jejich úspěšný běh; Claude má testy spustit lokálně před nasazením.
+- Monkey C testy spuštěné v simulátoru SDK 9.2.0: **Bridge 8/8, WatchFace 5/5**, bez chyb.
+- GitHub Actions Garmin project checks: prošly. Zdrojové soubory byly porovnány s commitem
+  na cílové větvi; jde o stejné soubory, ze kterých vznikly ověřené buildy.
+- Vizuálně zkontrolovaný skutečný renderer v simulátoru FR165 s testovacími hodnotami:
+  čerstvá/stará/chybějící hodnota, budoucí timestamp, neznámý trend, čtyřmístné mg/dL,
+  čerstvá i stará data v AMOLED sleep. Bez překrytí nebo oříznutí textu.
+- Finální release ciferníku spuštěný bez publisheru: `NO DATA`, nativní tep a nula kroků
+  zobrazené správně, bez runtime chyby.
 - USB sideload a ověření nové verze na fyzických hodinkách nebyly provedené.
 
 ## Nasazení obou aplikací přes USB – pro Claude Code
