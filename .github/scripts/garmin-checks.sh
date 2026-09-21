@@ -8,6 +8,7 @@ set -euo pipefail
 
 root=garmin/MedProbeWatch
 face=garmin/xDripWatchFace
+field=garmin/MmolioDataField
 
 echo "=== project structure ==="
 for required in \
@@ -31,7 +32,49 @@ for required in \
   "$face/resources/drawables.xml"; do
   test -f "$required" || { echo "::error::missing $required"; exit 1; }
 done
+for required in \
+  "$field/manifest.xml" \
+  "$field/monkey.jungle" \
+  "$field/source/MmolioDataFieldApp.mc" \
+  "$field/source/MmolioDataFieldView.mc" \
+  "$field/source/FieldReceiver.mc" \
+  "$field/source/FieldRenderer.mc" \
+  "$field/resources/properties.xml" \
+  "$field/resources/settings.xml" \
+  "$field/resources/strings.xml"; do
+  test -f "$required" || { echo "::error::missing $required"; exit 1; }
+done
 echo "OK: every expected file is present."
+
+echo
+echo "=== application identities ==="
+# The phone addresses each app by these IDs; changing one silently cuts it off.
+python3 - <<'PYEOF'
+import sys, xml.etree.ElementTree as ET
+ns = {"iq": "http://www.garmin.com/xml/connectiq"}
+expected = {
+    "garmin/MedProbeWatch/manifest.xml": ("a1b2c3d4e5f647589a0b1c2d3e4f5061", "watch-app", None),
+    "garmin/xDripWatchFace/manifest.xml": ("b1c2d3e4f5a647589a0b1c2d3e4f5072", "watchface", None),
+    "garmin/MmolioDataField/manifest.xml": ("7ca56fd800634cab90f28d5e72be2e05", "datafield", "5.0.0"),
+}
+failed = False
+for path, (app_id, app_type, min_api) in expected.items():
+    app = ET.parse(path).getroot().find("iq:application", ns)
+    actual = (app.get("id"), app.get("type"))
+    if actual != (app_id, app_type) or (min_api and app.get("minApiLevel") != min_api):
+        print(f"::error::{path} has id/type/minApiLevel {actual + (app.get('minApiLevel'),)}")
+        failed = True
+    else:
+        print(f"  ok   {path}: {app_type} {app_id}")
+field = ET.parse("garmin/MmolioDataField/manifest.xml").getroot().find("iq:application", ns)
+permissions = {p.get("id") for p in field.iter("{%s}uses-permission" % ns["iq"])}
+# Data fields may not subscribe to complications; the field must receive phone messages.
+if "Communications" not in permissions or permissions & {"ComplicationSubscriber", "ComplicationPublisher"}:
+    print(f"::error::Mmolio DataField permissions are {sorted(permissions)}")
+    failed = True
+sys.exit(1 if failed else 0)
+PYEOF
+echo "OK: application identities are unchanged."
 
 echo
 echo "=== XML well-formedness ==="
@@ -80,6 +123,13 @@ for pair in 'version:v' 'mgdl:g' 'trend:t' 'measuredAt:m' 'source:s' 'sequence:q
   grep -qE "KEY_[A-Z_]+ = \"$key\"" "$MONKEY" || {
     echo "::error::Monkey C is missing the key \"$key\""; exit 1; }
 done
+# Mmolio DataField must parse the phone packet with Bridge's own files, not a copy.
+for shared in GlucoseReading GlucoseStore; do
+  grep -q "\.\./MedProbeWatch/source/$shared.mc" "$field/monkey.jungle" || {
+    echo "::error::Mmolio DataField does not compile Bridge's $shared.mc"; exit 1; }
+  test ! -e "$field/source/$shared.mc" || {
+    echo "::error::Mmolio DataField has its own copy of $shared.mc"; exit 1; }
+done
 echo "OK: both sides agree on the wire format."
 
 echo
@@ -90,4 +140,6 @@ for view in MedProbeView; do
   grep -q "isStale" "$root/source/$view.mc" || {
     echo "::error::$view does not check staleness"; exit 1; }
 done
+grep -q "isStale" "$field/source/FieldRenderer.mc" || {
+  echo "::error::Mmolio DataField does not check staleness"; exit 1; }
 echo "OK: staleness is checked wherever a value is drawn."

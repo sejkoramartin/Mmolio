@@ -1,0 +1,5 @@
+<properties>
+    <!-- Separate from Mmolio Bridge settings: each Connect IQ app has its own. -->
+    <property id="useMmol" type="boolean">true</property>
+    <property id="staleMinutes" type="number">15</property>
+</properties>

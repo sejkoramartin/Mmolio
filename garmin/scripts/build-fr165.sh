@@ -25,8 +25,12 @@ cd -- "$repo"
     -o "$out/MmolioBridge.prg" -y "$key" -l 2 "${flags[@]}"
 "$sdk/bin/monkeyc" -f garmin/xDripWatchFace/monkey.jungle -d fr165 \
     -o "$out/MmolioWatchFace.prg" -y "$key" -l 2 "${flags[@]}"
-printf 'Built both applications: %s\n' "$out"
+"$sdk/bin/monkeyc" -f garmin/MmolioDataField/monkey.jungle -d fr165 \
+    -o "$out/MmolioDataField.prg" -y "$key" -l 2 "${flags[@]}"
+printf 'Built all three applications: %s\n' "$out"
 if [[ $mode == test ]]; then
-    printf 'With the SDK simulator running, run:\n  %q %q fr165 -t\n  %q %q fr165 -t\n' \
-        "$sdk/bin/monkeydo" "$out/MmolioBridge.prg" "$sdk/bin/monkeydo" "$out/MmolioWatchFace.prg"
+    printf 'With the SDK simulator running, run:\n'
+    for app in MmolioBridge MmolioWatchFace MmolioDataField; do
+        printf '  %q %q fr165 -t\n' "$sdk/bin/monkeydo" "$out/$app.prg"
+    done
 fi

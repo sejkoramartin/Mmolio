@@ -3,11 +3,13 @@
 - **Mmolio Bridge** – receiver watch-app, příjem z telefonu i na pozadí.
 - **Mmolio WatchFace** – AMOLED ciferník: datum, baterie, čas, glykemie, trend,
   stáří měření, aktuální tep a dnešní kroky.
-- **Mmolio DataField** – rezervovaný název budoucího datového pole; zatím není implementované.
+- **Mmolio DataField** – datové pole pro sportovní aktivity: glykemie, trend, jednotka a
+  skutečné stáří měření. Data přijímá přímo z telefonu pod vlastním ID (viz níže).
 
 Historické složky `MedProbeWatch`, `xDripWatchFace` a interní namespace zůstávají kvůli
 kontinuitě. V menu hodinek jsou nové názvy; na ciferníku ani obrazovce Bridge není
-nápis MedProbe nebo xDrip. iOS část se touto úpravou nemění.
+nápis MedProbe nebo xDrip. Nový projekt `garmin/MmolioDataField` už nese nový název.
+iOS část MedProbe se touto úpravou nemění.
 
 ## Identita a přenos – neměnit
 
@@ -15,6 +17,7 @@ nápis MedProbe nebo xDrip. iOS část se touto úpravou nemění.
 |---|---|---|
 | Mmolio Bridge | `a1b2c3d4e5f647589a0b1c2d3e4f5061` | `garmin/MedProbeWatch` |
 | Mmolio WatchFace | `b1c2d3e4f5a647589a0b1c2d3e4f5072` | `garmin/xDripWatchFace` |
+| Mmolio DataField | `7ca56fd800634cab90f28d5e72be2e05` | `garmin/MmolioDataField` |
 
 Ověřená cesta: **xDrip4iOS → Garmin Connect / Connect IQ → Mmolio Bridge → complication
 → Mmolio WatchFace**. Receiver je stále stejná aplikace. Phone wire protokol je stále v1:
@@ -76,6 +79,50 @@ Tep a kroky pocházejí z nativních Garmin complications. Chybějící tep je `
 poslední historická hodnota; nula kroků je platná. Hodiny respektují čas hodinek a používají
 24hodinový formát. Ciferník nezapíná senzor ani neprovádí síťové požadavky.
 
+## Mmolio DataField
+
+Connect IQ nedovoluje datovému poli odebírat complications: oprávnění
+`ComplicationSubscriber` je jen pro ciferníky a kompilátor ho u `datafield` odmítne. Pole
+proto **nečte Bridge**, ale přijímá stejný telefonní paket v1 `{v,g,t,m,s,q}` přímo, pod
+vlastním application ID `7ca56fd800634cab90f28d5e72be2e05`. Foreground `Communications` je
+pro datová pole podporované od API 5.0.0 (`minApiLevel="5.0.0"`, FR165 má 5.2.0).
+
+**Telefon musí posílat kopii každého nového měření i na toto ID**, nezávisle na výsledku
+doručení do Bridge. Starší xDrip4iOS posílá jen Bridge – pole pak zůstane na `NO DATA`,
+takže samotný USB sideload nestačí. Nutná je verze xDrip4iOS s tímto odesíláním (fork
+`sejkoramartin/xdripswift`, větev `feature/garmin-watch`).
+
+- Parser a pořadí zpráv jsou **přímo soubory Bridge** `GlucoseReading.mc` a `GlucoseStore.mc`
+  (zakompilované beze změny přes `monkey.jungle`): duplicitní, opožděné a starší pakety pole
+  odmítne stejně jako Bridge. Navíc musí hodnota projít `Mmolio.SampleCodec`, stejným
+  validátorem jako na ciferníku; neplatný paket se neuloží a zůstane poslední platné měření.
+- Oprávnění `Background` je v manifestu jen proto, že sdílené soubory Bridge nesou anotaci
+  `(:background)`; kompilátor ho pak vyžaduje. Pole žádnou background službu neregistruje.
+- Poslední platné měření se ukládá do vlastního úložiště pole se **skutečným časem měření**
+  a po restartu pole se načte. Stáří se počítá při každém překreslení (jednou za sekundu),
+  i bez nových zpráv a při pozastavené aktivitě. Nikdy se nepoužívá čas příjmu.
+- Zprávy přijímá callback, když je pole zobrazené v aktivitě. Při registraci převezme i
+  zprávy, které pro něj Connect IQ ještě drží, ale doručení do neběžícího pole není
+  zaručené – telefon může dostat chybu doručení. Do dalšího měření pole ukáže uložené
+  měření s jeho skutečným stářím. Bridge nemusí být otevřený.
+- Stavy: čerstvé – tyrkysová hodnota, geometrická šipka, jednotka a stáří; od limitu stáří –
+  šedá hodnota, `STALE` se stářím, bez šipky; budoucí čas – `CHECK TIME`, bez šipky; bez
+  platného měření (např. po nové instalaci) – `--` / `NO DATA`; neznámý trend – `?`.
+- Rozložení se počítá z rozměrů `dc` a `getObscurityFlags()` (viditelná část kulatého
+  displeje), ne z pevných 390 px: plné pole, 2 pole, 3 pole i kompaktní 4polový layout.
+  Barvy sledují motiv aktivity (`getBackgroundColor()`): černé pozadí s tyrkysovou, nebo
+  bílé pozadí s tmavě tyrkysovou hodnotou. Když není místo, zmizí nejdřív jednotka, stáří
+  nikdy.
+- **Nastavení jsou samostatná** (`useMmol`, výchozí mmol/L; `staleMinutes` 5–120, výchozí
+  15), nezávislá na nastavení Bridge – každá Connect IQ aplikace má vlastní. Nastavují se
+  v Garmin Connect / Connect IQ u aplikace Mmolio DataField.
+- Pole neřídí aktivitu, nevibruje a nezapisuje do FIT.
+
+Přidání do aktivity na FR165 (názvy položek podle českého manuálu hodinek): v profilu
+aktivity (např. Běh) otevři nastavení aktivity podržením UP → Datové obrazovky → vyber
+obrazovku a pole → Connect IQ → **Mmolio DataField**. Na zařízeních s API 5.2 nabídne
+Garmin po instalaci také přiřazení pole k aktivitám.
+
 ## Build s SDK 9.2.0
 
 Předpoklady: Java, **Connect IQ SDK 9.2.0**, definice zařízení **fr165** v SDK Manageru a
@@ -90,12 +137,13 @@ export DEVELOPER_KEY="$HOME/Stažené/MedProbe-garmin/developer_key.der"
 ./garmin/scripts/build-fr165.sh
 ```
 
-Skript kontroluje přesnou verzi SDK, používá kontrolu typů `-l 2`, sestaví release obou
-aplikací a skončí chybou, pokud kterýkoli build selže:
+Skript kontroluje přesnou verzi SDK, používá kontrolu typů `-l 2`, sestaví release všech
+tří aplikací a skončí chybou, pokud kterýkoli build selže:
 
 ```text
 build/fr165/release/MmolioBridge.prg
 build/fr165/release/MmolioWatchFace.prg
+build/fr165/release/MmolioDataField.prg
 ```
 
 Na Windows lze použít stejné projekty přímo s `monkeyc.bat` (cesty přizpůsobit):
@@ -108,6 +156,8 @@ New-Item -ItemType Directory -Force build/fr165/release
 if ($LASTEXITCODE -ne 0) { throw 'Bridge build failed' }
 & "$Sdk\bin\monkeyc.bat" -f garmin/xDripWatchFace/monkey.jungle -d fr165 -o build/fr165/release/MmolioWatchFace.prg -y $Key -l 2 -r
 if ($LASTEXITCODE -ne 0) { throw 'WatchFace build failed' }
+& "$Sdk\bin\monkeyc.bat" -f garmin/MmolioDataField/monkey.jungle -d fr165 -o build/fr165/release/MmolioDataField.prg -y $Key -l 2 -r
+if ($LASTEXITCODE -ne 0) { throw 'DataField build failed' }
 ```
 
 ## Kontroly
@@ -119,7 +169,14 @@ if ($LASTEXITCODE -ne 0) { throw 'WatchFace build failed' }
 # V druhém terminálu, s běžícím simulátorem:
 "$CONNECTIQ_SDK/bin/monkeydo" build/fr165/test/MmolioBridge.prg fr165 -t
 "$CONNECTIQ_SDK/bin/monkeydo" build/fr165/test/MmolioWatchFace.prg fr165 -t
+"$CONNECTIQ_SDK/bin/monkeydo" build/fr165/test/MmolioDataField.prg fr165 -t
 ```
+
+Testy DataFieldu ověřují příjem paketu v1, zachování času měření po restartu, přesnou
+hranici zastarání, duplicitní, starší a opožděné pakety podle pravidel Bridge, odmítnutí
+neplatných paketů se zachováním posledního platného, budoucí čas, mmol/L i mg/dL,
+čtyřmístné mg/dL, velké timestampy a validaci vlastních nastavení. Testy po sobě mažou
+uložené měření, protože simulátor sdílí úložiště s aplikací.
 
 Monkey C testy ověřují serializaci skutečného publisheru a dekódování ciferníku, hranici
 zastarání, opakované doručení bez omlazení dat, budoucí čas, změnu jednotek a limitu,
@@ -145,7 +202,27 @@ přenos ani doručování mezi dvěma současně nainstalovanými aplikacemi.
   zobrazené správně, bez runtime chyby.
 - USB sideload a ověření nové verze na fyzických hodinkách nebyly provedené.
 
-## Nasazení obou aplikací přes USB – pro Claude Code
+### Stav ověření Mmolio DataField 21. 9. 2026
+
+- Všechny tři release i test buildy pro FR165 přes `build-fr165.sh`: **BUILD SUCCESSFUL**,
+  SDK 9.2.0, `-l 2`. Release Bridge a WatchFace jsou bajtově shodné s předchozími
+  ověřenými buildy (SHA-256 `eacd0fe1…` a `1fd9cc3b…`).
+- Monkey C testy DataFieldu v simulátoru SDK 9.2.0: **12/12** (7 nových a 5 sdílených testů
+  kodeku).
+- Produkční release DataFieldu po testech v tomtéž simulátoru: `-- / NO DATA`, bez runtime
+  chyby.
+- Vizuální kontrola produkčního rendereru v přesných layoutech FR165 ze `simulator.json`
+  (1, 2, 3 a 4 pole, tmavé i světlé téma). Simulátor se před každým scénářem čistě
+  restartoval a načtení správného scénáře bylo ověřeno značkou v logu. Stavy: čerstvé, STALE
+  (1h12m, 2h5m, 23h59m, 12d), CHECK TIME, NO DATA, neznámý trend, dvojité šipky,
+  čtyřmístné mg/dL. Bez překrytí a ořezu.
+- Příjem zpráv z telefonu simulátor neověří; to zbývá na hodinkách s aktualizovaným
+  xDrip4iOS.
+
+## Nasazení aplikací přes USB – pro Claude Code
+
+Mmolio DataField je nová aplikace s novým ID: nahrává se jako nový soubor
+`MmolioDataField.prg`, nic nepřepisuje. Data dostane jen s aktualizovaným xDrip4iOS.
 
 1. V lokálním repozitáři ověř čistý stav, checkout `feature/xdrip-garmin-complication`,
    `git pull --ff-only`. Nemergovat do main. Při lokálních změnách je nejprve zachovat.

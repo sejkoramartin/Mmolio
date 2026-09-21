@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<!--
+  Mmolio DataField for Garmin Connect IQ.
+
+  Data fields cannot subscribe to complications, so this field receives the same phone v1
+  packet as Mmolio Bridge directly, under its own application ID. The phone must send a
+  copy of every reading to this ID; an older phone app that only addresses Bridge leaves
+  the field at NO DATA.
+
+  Foreground Communications is available to data fields from API 5.0.0. Background is
+  required only because the shared, unchanged Bridge parser and store carry the
+  (:background) annotation; the field registers no background service.
+-->
+<iq:manifest xmlns:iq="http://www.garmin.com/xml/connectiq" version="3">
+    <iq:application
+        id="7ca56fd800634cab90f28d5e72be2e05"
+        type="datafield"
+        name="@Strings.AppName"
+        entry="MmolioField.MmolioDataFieldApp"
+        launcherIcon="@Drawables.LauncherIcon"
+        minApiLevel="5.0.0">
+
+        <iq:products>
+            <iq:product id="fr165"/>
+        </iq:products>
+
+        <iq:permissions>
+            <iq:uses-permission id="Communications"/>
+            <iq:uses-permission id="Background"/>
+        </iq:permissions>
+
+        <iq:languages>
+            <iq:language>eng</iq:language>
+        </iq:languages>
+    </iq:application>
+</iq:manifest>

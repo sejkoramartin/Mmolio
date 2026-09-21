@@ -1,0 +1,5 @@
+<strings>
+    <string id="AppName">Mmolio DataField</string>
+    <string id="UseMmolTitle">Show mmol/L</string>
+    <string id="StaleMinutesTitle">Mark stale after</string>
+</strings>
