@@ -49,6 +49,7 @@ module MedProbe {
 
         function getInitialView() {
             registerBackgroundReceiver();
+            GlucoseComplication.publish(GlucoseStore.load());
             return [new MedProbeView()];
         }
 
@@ -60,6 +61,15 @@ module MedProbe {
             if ((Toybox has :Background) && (Background has :registerForPhoneAppMessageEvent)) {
                 Background.registerForPhoneAppMessageEvent();
             }
+        }
+
+        function onSettingsChanged() as Void {
+            GlucoseComplication.publish(GlucoseStore.load());
+            WatchUi.requestUpdate();
+        }
+
+        function onBackgroundData(data) as Void {
+            WatchUi.requestUpdate();
         }
 
         // Registers the background service, so readings arrive while the app is closed.

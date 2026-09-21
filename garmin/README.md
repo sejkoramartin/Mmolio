@@ -1,176 +1,185 @@
-# MedProbe pro Garmin
+# Mmolio pro Garmin Forerunner 165
 
-Connect IQ aplikace, která přijímá glykemii z MedProbe na iPhonu a zobrazuje ji na
-Forerunner 255 a Forerunner 165.
+- **Mmolio Bridge** – receiver watch-app, příjem z telefonu i na pozadí.
+- **Mmolio WatchFace** – AMOLED ciferník: datum, baterie, čas, glykemie, trend,
+  stáří měření, aktuální tep a dnešní kroky.
+- **Mmolio DataField** – rezervovaný název budoucího datového pole; zatím není implementované.
 
-## Architektura
+Historické složky `MedProbeWatch`, `xDripWatchFace` a interní namespace zůstávají kvůli
+kontinuitě. V menu hodinek jsou nové názvy; na ciferníku ani obrazovce Bridge není
+nápis MedProbe nebo xDrip. iOS část se touto úpravou nemění.
 
-Ciferník na Garminu **nemůže** přijímat zprávy z telefonu — Connect IQ to watch face API
-nedovoluje. A jedna aplikace nemůže být zároveň watch-app a ciferník. Cílový tvar je proto:
+## Identita a přenos – neměnit
 
-```
-iPhone (MedProbe)
-   │  Connect IQ zpráva
-   ▼
-watch-app (tento projekt)      ← registruje se pro zprávy, ukládá poslední hodnotu
-   │  complication
-   ▼
-ciferník (samostatný projekt)  ← přihlásí se k complication a kreslí ji
-```
+| Komponenta | application ID | Projekt |
+|---|---|---|
+| Mmolio Bridge | `a1b2c3d4e5f647589a0b1c2d3e4f5061` | `garmin/MedProbeWatch` |
+| Mmolio WatchFace | `b1c2d3e4f5a647589a0b1c2d3e4f5072` | `garmin/xDripWatchFace` |
 
-Hotová je zatím první část. Hodnota se ukládá do `Storage`, ne jen do paměti, protože
-Connect IQ aplikaci mezi zprávami běžně restartuje.
+Ověřená cesta: **xDrip4iOS → Garmin Connect / Connect IQ → Mmolio Bridge → complication
+→ Mmolio WatchFace**. Receiver je stále stejná aplikace. Phone wire protokol je stále v1:
 
-## Struktura
-
-```
-manifest.xml                 aplikace, podporovaná zařízení, oprávnění
-monkey.jungle                build konfigurace, device-specific resource paths
-source/
-  GlucoseReading.mc          wire formát a pravidla přijetí zprávy
-  GlucoseStore.mc            uložení poslední hodnoty, práh zastarání
-  Formatter.mc               hodnota, šipka, stáří, jednotky
-  MedProbeApp.mc             příjem zpráv z telefonu
-  MedProbeView.mc            obrazovka s glykemií
-resources/                   sdílené texty a nastavení
-resources-fr255/             layout pro FR255 (připraveno, čeká na definici zařízení)
-resources-fr165/             layout pro FR165 (ověřeno)
-```
-
-FR255 a FR165 se liší **jen** rozměry v `layouts.xml`. Logika je sdílená.
-
-## Stav
-
-`fr165` je **ověřený** — projekt se sestaví lokálním SDK 9.2.0 do `.prg`.
-
-`fr255` zatím ne: chybí jeho definice zařízení. Je zakomentovaný v `manifest.xml`
-i `monkey.jungle`, protože monkeyc validuje **každý** qualifier v jungle, i když buduješ
-pro jediné zařízení — takže nesplněný odkaz shodí build úplně. Až stáhneš definici pro
-fr255 v SDK manageru, odkomentuj obojí. Resources pro něj už připravené jsou.
-
-Ciferník v tomhle projektu **není**. Connect IQ nedovolí, aby jedna aplikace byla zároveň
-`watch-app` a `watchface` — musí to být dva samostatné projekty. Tenhle je watch-app:
-přijme zprávu z telefonu, uloží ji a zobrazí. Ciferník, který ji přečte přes complication,
-je další krok.
-
-## Build
-
-**CI plný build spustit nemůže.** Connect IQ SDK archiv obsahuje kompilátor a dokumentaci,
-ale ne definice jednotlivých zařízení — ty stahuje SDK manager, desktopový nástroj bez CLI.
-Bez nich `monkeyc` odmítne každý device qualifier:
-
-```
-ERROR: 'fr255' is not a valid device / family qualifier.
-```
-
-CI proto kontroluje vše ostatní: strukturu projektu, validitu XML, deklaraci obou zařízení,
-shodu wire protokolu s iOS stranou a přítomnost kontroly zastaralých hodnot.
-
-### Lokální build
-
-1. Stáhni [Connect IQ SDK Manager](https://developer.garmin.com/connect-iq/sdk/)
-2. V něm stáhni SDK a **device definice pro fr255 a fr165**
-3. Vygeneruj vývojářský klíč:
-
-```bash
-openssl genrsa -out developer_key.pem 4096
-openssl pkcs8 -topk8 -inform PEM -outform DER \
-  -in developer_key.pem -out developer_key.der -nocrypt
-```
-
-4. Build:
-
-```bash
-monkeyc -f garmin/MedProbeWatch/monkey.jungle \
-        -d fr255 \
-        -o MedProbe-fr255.prg \
-        -y developer_key.der \
-        -w
-
-monkeyc -f garmin/MedProbeWatch/monkey.jungle \
-        -d fr165 \
-        -o MedProbe-fr165.prg \
-        -y developer_key.der \
-        -w
-```
-
-Nejjednodušší cesta je rozšíření **Monkey C** pro VS Code — obsahuje SDK manager,
-simulátor i nasazení na hodinky.
-
-## Formát zprávy
-
-Definován na iOS v `MedProbe/Garmin/GarminMessage.swift`, na hodinkách
-v `source/GlucoseReading.mc`. CI kontroluje, že se obě strany neshodly rozejít.
-
-| klíč | význam |
+| Klíč | Význam |
 |---|---|
-| `v` | verze protokolu |
-| `g` | glykemie, celé číslo v mg/dL |
-| `t` | trend, 0–7 |
-| `m` | čas měření, Unix sekundy |
-| `s` | zdroj, 1 = Medtrum, 2 = LibreLinkUp |
+| `v` | verze, `1` |
+| `g` | celé mg/dL |
+| `t` | trend `0–7`; `0` neznámý, `4` stabilní |
+| `m` | skutečný čas měření v Unix sekundách |
+| `s` | zdroj: `1` Medtrum, `2` LibreLinkUp, `3` xDrip |
 | `q` | pořadové číslo |
 
-Klíče jsou jednoznakové, protože Connect IQ přenos má omezenou velikost a stojí baterii na
-obou stranách. Glykemie je celé číslo v mg/dL — Monkey C zachází s float nešikovně
-a rozlišení senzoru desetiny neospravedlňuje; na mmol/L se převádí až při zobrazení.
+Přijetí a řazení zpráv i klíč `lastReading` ve Storage zůstávají stejné. Bridge při prvním
+otevření volá `Background.registerForPhoneAppMessageEvent()`. Background delegate dál
+ukládá přijatá data, publikuje complication a končí přes `Background.exit(null)`.
+Chyba publikování nesmí zrušit uloženou hodnotu ani zablokovat ukončení background služby.
+Po aktualizaci Bridge jednou otevřít: zaregistruje příjem a znovu publikuje uložené měření
+s jeho **původním** časem. Změna jednotek nebo limitu stáří také přepublikuje uložené měření.
 
-Zprávu s neznámou verzí hodinky **ignorují**. Zobrazit špatně přečtenou hodnotu je horší
-než ukázat předchozí i s jejím stářím.
+## Čas měření a zastarání
 
-## Zastaralé hodnoty
+Connect IQ SDK 9.2.0 nemá v `Complication` pole pro čas měření. Samostatná complication
+jen s časem by umožnila přečíst hodnotu z jednoho měření a čas z jiného.
 
-Hodinky nikdy nevydávají starou hodnotu za aktuální:
+Proto nová **privátní complication index 1**, `Mmolio Glucose Sample v1`, přenáší jeden
+atomický ASCII řetězec v podporovaném poli `value`:
 
-- zašedne
-- doplní se stáří (`stale 23m`)
-- **trendová šipka zmizí úplně** — směr odvozený ze staré hodnoty je horší než žádný směr
-
-Práh je uživatelské nastavení, výchozí 15 minut. Oba zdroje dávají hodnotu každou
-1–2 minuty, takže 15 minut znamená několik zmeškaných cyklů.
-
-Chybějící trend se kreslí jako `?`, nikdy jako vodorovná šipka.
-
----
-
-# Odesílání do hodinek
-
-Connect IQ Companion App SDK je Garminem publikovaný **veřejný Swift package**:
-
-<https://github.com/garmin/connectiq-companion-app-sdk-ios>
-
-Je zapsaný v `project.yml` jako závislost, připnutý na verzi 1.8.0. Nic se nestahuje ručně
-a CI si ho vyřeší samo — žádný framework v repozitáři, žádné přihlašování.
-
-```yaml
-packages:
-  ConnectIQ:
-    url: https://github.com/garmin/connectiq-companion-app-sdk-ios
-    exactVersion: 1.8.0
+```text
+1|115|5|1700000000|1|900
+verze|mgdl|trend|measuredAtUnixSeconds|mmolFlag|staleSeconds
 ```
 
-`ConnectIQTransport.swift` je za `#if canImport(ConnectIQ)`, takže projekt se přeloží
-i kdyby se package někdy nevyřešil — jen by spadl zpět na neaktivní transport.
+Je to interní kontrakt mezi dvěma Garmin aplikacemi, nikoli změna telefonního wire
+protokolu. Obě `.prg` **musí být podepsané stejným existujícím vývojářským klíčem**,
+protože privátní complication je dostupná jen aplikacím podepsaným stejným klíčem.
+V SDK se `faceIt` deklaruje jen u public/protected komplikací, nikoli u této privátní.
 
-## Co ještě zbývá
+Původní veřejná complication index 0 (`CGM Glucose`) zůstává pro kompatibilitu starších
+odběratelů. **Nemá živou ochranu stáří po zastavení publisheru**; nový ciferník ji proto
+nikdy nepoužívá. Se starým Bridge ukáže nový ciferník bezpečně `NO DATA`; aktualizovat oba.
 
-**1. Identifikátor aplikace musí souhlasit.** `ConnectIQTransport.watchAppID` a `id`
-v `garmin/MedProbeWatch/manifest.xml` se hledají navzájem a musí být shodné. Teď:
+Ciferník při každém překreslení počítá `now − measuredAt`, nezávisle na příchodu callbacku:
 
+- Čerstvé: tyrkysová glykemie, geometrická trendová šipka, jednotka a stáří.
+- Od přesného limitu stáří (výchozí **15 minut**, nastavení Bridge 5–120 minut): šedá
+  glykemie, **STALE** se stářím, **žádná šipka**.
+- Čas měření v budoucnosti: šedá hodnota, **CHECK TIME**, žádná šipka.
+- Chybějící Bridge, starý payload bez času, neznámá verze nebo neplatný formát: **-- / NO DATA**.
+- Neznámý trend: `?`, nikdy šipka pro stabilní glykemii.
+
+Limit je zkontrolován i při minutových aktualizacích ciferníku v úsporném režimu; změna
+stavu se tak projeví nejpozději při následujícím překreslení. Režim AMOLED sleep zmenší
+čas a glykemii, skryje sekundární údaje a posouvá obsah; informace o stáří zůstává vidět.
+Bridge má při otevřené obrazovce vlastní obnovu po 30 s, takže stará hodnota nezůstane
+bez označení ani při dlouho otevřené aplikaci bez nových zpráv.
+
+Tep a kroky pocházejí z nativních Garmin complications. Chybějící tep je `--`, nikoli
+poslední historická hodnota; nula kroků je platná. Hodiny respektují čas hodinek a používají
+24hodinový formát. Ciferník nezapíná senzor ani neprovádí síťové požadavky.
+
+## Build s SDK 9.2.0
+
+Předpoklady: Java, **Connect IQ SDK 9.2.0**, definice zařízení **fr165** v SDK Manageru a
+**stávající** vývojářský `.der` klíč použitý u nainstalovaných aplikací. Klíč necommitovat.
+FR255 resources zůstávají připravené, ale tento build cílí pouze na FR165.
+
+Z kořene repozitáře na Linuxu (na tomto PC jsou tyto cesty již dostupné):
+
+```bash
+export CONNECTIQ_SDK="$HOME/.Garmin/ConnectIQ/Sdks/connectiq-sdk-lin-9.2.0"
+export DEVELOPER_KEY="$HOME/Stažené/MedProbe-garmin/developer_key.der"
+./garmin/scripts/build-fr165.sh
 ```
-a1b2c3d4e5f647589a0b1c2d3e4f5061
+
+Skript kontroluje přesnou verzi SDK, používá kontrolu typů `-l 2`, sestaví release obou
+aplikací a skončí chybou, pokud kterýkoli build selže:
+
+```text
+build/fr165/release/MmolioBridge.prg
+build/fr165/release/MmolioWatchFace.prg
 ```
 
-Vlastní vygeneruješ přes `uuidgen | tr -d '-' | tr 'A-Z' 'a-z'`, ale pak ho změň na
-**obou** místech.
+Na Windows lze použít stejné projekty přímo s `monkeyc.bat` (cesty přizpůsobit):
 
-**2. Watchapp musí být v hodinkách.** Bez ní není kam posílat. Sestav `.prg` podle
-postupu výše a nahraj přes VS Code rozšíření Monkey C nebo zkopíruj do `GARMIN/APPS`
-na připojených hodinkách.
+```powershell
+$Sdk = 'C:\path\to\connectiq-sdk-9.2.0'
+$Key = 'C:\path\to\existing\developer_key.der'
+New-Item -ItemType Directory -Force build/fr165/release
+& "$Sdk\bin\monkeyc.bat" -f garmin/MedProbeWatch/monkey.jungle -d fr165 -o build/fr165/release/MmolioBridge.prg -y $Key -l 2 -r
+if ($LASTEXITCODE -ne 0) { throw 'Bridge build failed' }
+& "$Sdk\bin\monkeyc.bat" -f garmin/xDripWatchFace/monkey.jungle -d fr165 -o build/fr165/release/MmolioWatchFace.prg -y $Key -l 2 -r
+if ($LASTEXITCODE -ne 0) { throw 'WatchFace build failed' }
+```
 
-**3. Spárování v telefonu:** MedProbe → Settings → Garmin watch → vyber hodinky
-(otevře se Garmin Connect, potvrdíš, vrátí tě to zpět) → **Send a test reading**.
+## Kontroly
 
-Když se hodnota neobjeví, kontroluj v tomhle pořadí: je watchapp nainstalovaná, souhlasí
-`watchAppID` s manifestem, jsou hodinky připojené v Garmin Connect, ukazuje Settings stav
-*Connected*.
+```bash
+.github/scripts/garmin-checks.sh
+./garmin/scripts/build-fr165.sh --test
+"$CONNECTIQ_SDK/bin/connectiq"
+# V druhém terminálu, s běžícím simulátorem:
+"$CONNECTIQ_SDK/bin/monkeydo" build/fr165/test/MmolioBridge.prg fr165 -t
+"$CONNECTIQ_SDK/bin/monkeydo" build/fr165/test/MmolioWatchFace.prg fr165 -t
+```
+
+Monkey C testy ověřují serializaci skutečného publisheru a dekódování ciferníku, hranici
+zastarání, opakované doručení bez omlazení dat, budoucí čas, změnu jednotek a limitu,
+velké timestampy, neznámý trend a odmítnutí neplatných payloadů. Kontrolují také původní
+telefonní paket a řazení zpráv. Testy jsou z release buildu odstraněné.
+
+CI bez definic Garmin zařízení dělá jen strukturální a wire kontroly; nenahrazuje lokální
+kompilaci ani skutečné hodinky. Samotný simulátor neověří Bluetooth/iPhone background
+přenos ani doručování mezi dvěma současně nainstalovanými aplikacemi.
+
+### Stav ověření 21. 9. 2026
+
+- Oba release buildy pro FR165: **BUILD SUCCESSFUL**, SDK 9.2.0, `-l 2 -r`.
+- Oba buildy s Monkey C testy: **BUILD SUCCESSFUL**, SDK 9.2.0, `-l 2 -t`.
+- Existující `.github/scripts/garmin-checks.sh`, syntaxe build skriptu a `git diff --check`: prošly.
+- **Běh testů ani vizuální kontrola v simulátoru nebyly dokončené.** Simulátor narazil
+  na starý zámek a následně chybu oprávnění pracovního sandboxu. Kompilace testů není
+  totéž jako jejich úspěšný běh; Claude má testy spustit lokálně před nasazením.
+- USB sideload a ověření nové verze na fyzických hodinkách nebyly provedené.
+
+## Nasazení obou aplikací přes USB – pro Claude Code
+
+1. V lokálním repozitáři ověř čistý stav, checkout `feature/xdrip-garmin-complication`,
+   `git pull --ff-only`. Nemergovat do main. Při lokálních změnách je nejprve zachovat.
+2. Spusť kontroly a release build výše se **stejným původním podpisovým klíčem**.
+3. Připoj FR165 přes USB. Ověř zařízení pomocí `GARMIN/GarminDevice.xml` a najdi skutečnou
+   složku `GARMIN/APPS` (někde `GARMIN/Apps`). Na Linuxu může být zařízení přístupné přes
+   MTP místo běžné připojené složky; v takovém případě použij MTP přenos.
+4. Zálohuj původní dvě `.prg` mimo hodinky. Nahraď **jen tyto dvě aplikace**. Zachovej
+   jejich existující cílové názvy souborů; application ID se řídí manifestem, viditelný
+   název prostředky uvnitř `.prg`. Nemaž žádné jiné aplikace ani složky DATA/SETTINGS.
+   Jestli jsou současné soubory `MedProbe.prg` a `xDripWatchFace.prg`, je příklad:
+
+   ```bash
+   GARMIN_APPS='/skutecna/cesta/GARMIN/APPS'
+   cp build/fr165/release/MmolioBridge.prg "$GARMIN_APPS/MedProbe.prg"
+   cp build/fr165/release/MmolioWatchFace.prg "$GARMIN_APPS/xDripWatchFace.prg"
+   cmp build/fr165/release/MmolioBridge.prg "$GARMIN_APPS/MedProbe.prg"
+   cmp build/fr165/release/MmolioWatchFace.prg "$GARMIN_APPS/xDripWatchFace.prg"
+   sync
+   ```
+
+   Pokud jsou názvy jiné (např. Garmin přejmenoval soubory), nejprve identifikuj obě
+   nainstalované aplikace; neodhaduj cíle a nevytvářej druhou kopii téhož ID pod jiným názvem.
+   U MTP soubory po přenosu načti zpět a porovnej. Pak zařízení bezpečně odpoj.
+5. Na hodinkách **jednou otevři Mmolio Bridge**, pak nastav **Mmolio WatchFace**.
+6. Ověř čerstvou hodnotu, trend, jednotku a stáří; nech Bridge zavřený, iPhone zamčený
+   a sleduj několik nových měření. Datum, baterie, aktuální tep a dnešní kroky mají
+   odpovídat hodinkám. Ověř i probuzení / Always On režim.
+7. Pro krátký test nastav v Bridge limit 5 minut, zastav přenos a počkej přes limit.
+   Ciferník musí bez další zprávy zešednout, zobrazit `STALE 5m` a skrýt šipku. Po obnovení
+   přenosu čerstvého měření se vrátí běžný vzhled. Vrať požadovaný limit, výchozí je 15 minut.
+8. Zapiš commit, verzi SDK, výsledky obou buildů, cesty k `.prg`, výsledek kopírování a
+   kontroly na hodinkách. Pokud hodinky nejsou připojené, pouze připrav obě `.prg` a uveď,
+   že sideload a příjem na fyzickém zařízení nebyly provedené.
+
+## SDK reference
+
+Implementace byla porovnána s lokální dokumentací SDK 9.2.0. Online API reference:
+[Complications](https://developer.garmin.com/connect-iq/api-docs/Toybox/Complications.html),
+[Complication](https://developer.garmin.com/connect-iq/api-docs/Toybox/Complications/Complication.html),
+[publikování a přístup](https://developer.garmin.com/connect-iq/core-topics/complications/),
+[WatchFace lifecycle](https://developer.garmin.com/connect-iq/api-docs/Toybox/WatchUi/WatchFace.html).

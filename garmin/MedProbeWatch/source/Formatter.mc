@@ -75,6 +75,7 @@ module MedProbe {
                 return "";
             }
             var seconds = reading.ageSeconds();
+            if (seconds < 0) { return "CHECK TIME"; }
             if (seconds < 60) {
                 return "now";
             }
@@ -95,16 +96,5 @@ module MedProbe {
             return value(reading) + " (" + age(reading) + ")";
         }
 
-        static function sourceName(reading) {
-            if (reading == null) {
-                return "";
-            }
-            switch (reading.source) {
-                case 1: return "Medtrum";
-                case 2: return "Libre";
-                case 3: return "xDrip";
-                default: return "CGM";
-            }
-        }
     }
 }

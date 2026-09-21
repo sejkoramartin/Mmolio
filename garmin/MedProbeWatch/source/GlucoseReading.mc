@@ -75,7 +75,8 @@ module MedProbe {
 
         // Whether it is too old to show as current.
         function isStale(thresholdSeconds) {
-            return ageSeconds() >= thresholdSeconds;
+            var age = ageSeconds();
+            return age < 0 || age >= thresholdSeconds;
         }
 
         // Whether this reading supersedes another. Applied on the watch as well as the

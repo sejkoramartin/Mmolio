@@ -1,6 +1,5 @@
 <properties>
     <property id="useMmol" type="boolean">true</property>
-    <!-- Both supported sources produce a value every one to two minutes, so fifteen
-         minutes means several cycles have been missed. -->
+    <!-- Default freshness limit, also published to Mmolio WatchFace. -->
     <property id="staleMinutes" type="number">15</property>
 </properties>

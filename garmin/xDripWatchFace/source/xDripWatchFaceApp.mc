@@ -4,21 +4,16 @@ using Toybox.Lang;
 using Toybox.WatchUi;
 
 module xDripFace {
-
     class xDripWatchFaceApp extends Application.AppBase {
-
-        // Must match GlucoseComplicationLongLabel in the MedProbeWatch resources.
-        static const GLUCOSE_LONG_LABEL = "CGM Glucose";
-
         var mComplicationId as Complications.Id? = null;
 
-        function initialize() {
-            AppBase.initialize();
-        }
+        function initialize() { AppBase.initialize(); }
 
         function onStart(state) {
             Complications.registerComplicationChangeCallback(method(:onComplicationChanged));
             subscribeToGlucose();
+            subscribeNative(Complications.COMPLICATION_TYPE_HEART_RATE);
+            subscribeNative(Complications.COMPLICATION_TYPE_STEPS);
         }
 
         function onStop(state) {
@@ -26,60 +21,53 @@ module xDripFace {
             Complications.registerComplicationChangeCallback(null);
         }
 
-        function getInitialView() {
-            return [new xDripWatchFaceView()];
-        }
+        function getInitialView() { return [new xDripWatchFaceView()]; }
 
         function onComplicationChanged(id as Complications.Id) as Void {
-            if (mComplicationId == null) {
-                // The publisher may have been installed after the face started.
-                subscribeToGlucose();
-            }
             WatchUi.requestUpdate();
         }
 
-        // Returns the published glucose text, or "--" when no publisher is available.
-        function currentGlucoseValue() as Lang.String {
-            if (mComplicationId == null) {
-                subscribeToGlucose();
-            }
-            if (mComplicationId == null) {
-                return "--";
-            }
-
+        // Never fall back to the old display string: it has no measurement time.
+        // Re-read on every draw, including minute updates without any phone events.
+        function currentGlucoseSample() as Mmolio.GlucoseSample? {
+            if (mComplicationId == null) { subscribeToGlucose(); }
+            if (mComplicationId == null) { return null; }
             try {
-                var complication = Complications.getComplication(mComplicationId);
-                return complication.value == null ? "--" : complication.value.toString();
+                return Mmolio.SampleCodec.decode(Complications.getComplication(mComplicationId).value);
             } catch (e instanceof Complications.ComplicationNotFoundException) {
-                // The publishing app was uninstalled; the system already dropped the
-                // subscription.
                 mComplicationId = null;
-                return "--";
+                return null;
             }
+        }
+
+        function nativeValue(type as Complications.Type) as Lang.Number? {
+            try {
+                var value = Complications.getComplication(new Complications.Id(type)).value;
+                if (value instanceof Lang.Number && value >= 0) { return value; }
+            } catch (e instanceof Complications.ComplicationNotFoundException) {
+                // Unavailable metrics are shown as --, never cached as current.
+            }
+            return null;
+        }
+
+        private function subscribeNative(type as Complications.Type) as Void {
+            try { Complications.subscribeToUpdates(new Complications.Id(type)); }
+            catch (e instanceof Complications.ComplicationNotFoundException) { }
         }
 
         private function subscribeToGlucose() as Void {
-            mComplicationId = findGlucoseComplication();
-            if (mComplicationId != null) {
-                Complications.subscribeToUpdates(mComplicationId);
-            }
-        }
-
-        // Connect IQ complications report COMPLICATION_TYPE_INVALID; native ones never
-        // carry this label, so the pair identifies the MedProbeWatch publisher.
-        private function findGlucoseComplication() as Complications.Id? {
             var iterator = Complications.getComplications();
             var complication = iterator.next();
-
             while (complication != null) {
                 if (complication.getType() == Complications.COMPLICATION_TYPE_INVALID &&
-                    complication.longLabel != null &&
-                    GLUCOSE_LONG_LABEL.equals(complication.longLabel)) {
-                    return complication.complicationId;
+                    Mmolio.SampleCodec.LONG_LABEL.equals(complication.longLabel)) {
+                    mComplicationId = complication.complicationId;
+                    try { Complications.subscribeToUpdates(complication.complicationId); }
+                    catch (e instanceof Complications.ComplicationNotFoundException) { mComplicationId = null; }
+                    return;
                 }
                 complication = iterator.next();
             }
-            return null;
         }
     }
 

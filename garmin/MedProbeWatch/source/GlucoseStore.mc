@@ -9,6 +9,7 @@
 
 using Toybox.Application;
 using Toybox.Application.Storage;
+using Toybox.Lang;
 
 module MedProbe {
 
@@ -19,8 +20,7 @@ module MedProbe {
 
         static const STORAGE_KEY = "lastReading";
 
-        // Default staleness threshold. Both supported sources produce a value every one
-        // to two minutes, so fifteen minutes means several cycles have been missed.
+        // Default staleness threshold; independent of the sensor sampling interval.
         static const DEFAULT_STALE_SECONDS = 900;
 
         // Reads the stored reading, or null.
@@ -44,7 +44,7 @@ module MedProbe {
         // Staleness threshold in seconds, from settings when the user has set one.
         static function staleThresholdSeconds() {
             var configured = Application.Properties.getValue("staleMinutes");
-            if (configured == null || configured <= 0) {
+            if (!(configured instanceof Lang.Number) || configured < 5 || configured > 120) {
                 return DEFAULT_STALE_SECONDS;
             }
             return configured * 60;

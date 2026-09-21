@@ -9,7 +9,7 @@
 
 project.manifest = manifest.xml
 
-base.sourcePath = source
+base.sourcePath = source;../shared
 base.resourcePath = resources
 
 fr165.resourcePath = $(base.resourcePath);resources-fr165

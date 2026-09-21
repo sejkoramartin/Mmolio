@@ -8,4 +8,9 @@
         glancePreview="true">
         <faceIt defaultText="@Strings.GlucoseComplicationName"/>
     </complication>
+    <!-- Atomic machine-readable sample, available only to apps signed with our key. -->
+    <complication id="1" access="private"
+        longLabel="@Strings.GlucoseSampleLongLabel"
+        shortLabel="@Strings.GlucoseComplicationShortLabel"
+        icon="@Drawables.GlucoseComplicationIcon" glancePreview="false"/>
 </complications>

@@ -11,14 +11,28 @@
 using Toybox.Graphics;
 using Toybox.Lang;
 using Toybox.WatchUi;
+using Toybox.Timer;
 
 module MedProbe {
 
     class MedProbeView extends WatchUi.View {
 
+        var mRefreshTimer;
+
         function initialize() {
             View.initialize();
         }
+
+        function onShow() as Void {
+            mRefreshTimer = new Timer.Timer();
+            mRefreshTimer.start(method(:refresh), 30000, true);
+        }
+
+        function onHide() as Void {
+            if (mRefreshTimer != null) { mRefreshTimer.stop(); mRefreshTimer = null; }
+        }
+
+        function refresh() as Void { WatchUi.requestUpdate(); }
 
         function onLayout(dc) {
             setLayout(Rez.Layouts.MainLayout(dc));
@@ -48,7 +62,7 @@ module MedProbe {
                 unitLabel.setText(Formatter.unitLabel());
             }
             if (ageLabel != null) {
-                ageLabel.setText(reading == null ? "no data" : Formatter.age(reading));
+                ageLabel.setText(reading == null ? "NO DATA" : (isStale ? "STALE " : "") + Formatter.age(reading));
                 ageLabel.setColor(isStale ? Graphics.COLOR_ORANGE : Graphics.COLOR_LT_GRAY);
             }
             View.onUpdate(dc);

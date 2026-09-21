@@ -1,5 +1,5 @@
 <strings>
-    <string id="AppName">MedProbe</string>
+    <string id="AppName">Mmolio Bridge</string>
     <string id="GlucoseComplicationLongLabel">CGM Glucose</string>
     <string id="GlucoseComplicationShortLabel">CGM</string>
     <string id="GlucoseComplicationName">Glucose</string>
@@ -7,4 +7,5 @@
     <string id="UseMmolPrompt">Off shows mg/dL instead.</string>
     <string id="StaleMinutesTitle">Mark stale after</string>
     <string id="StaleMinutesPrompt">Minutes before a reading is shown as out of date.</string>
+    <string id="GlucoseSampleLongLabel">Mmolio Glucose Sample v1</string>
 </strings>
