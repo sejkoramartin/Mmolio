@@ -9,7 +9,7 @@ module xDripFace {
             WatchFace.initialize();
         }
 
-        function onUpdate(dc) {
+        function onUpdate(dc as Graphics.Dc) as Void {
             dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_BLACK);
             dc.clear();
 
@@ -30,7 +30,8 @@ module xDripFace {
             dc.drawText(
                 centerX,
                 170,
-                Graphics.FONT_NUMBER_MEDIUM,
+                // Number fonts only contain digits; the value carries a trend arrow.
+                Graphics.FONT_LARGE,
                 glucose,
                 Graphics.TEXT_JUSTIFY_CENTER
             );

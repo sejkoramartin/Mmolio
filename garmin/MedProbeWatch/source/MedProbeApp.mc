@@ -9,6 +9,7 @@
 //
 
 using Toybox.Application;
+using Toybox.Background;
 using Toybox.Communications;
 using Toybox.System;
 using Toybox.WatchUi;
@@ -47,7 +48,18 @@ module MedProbe {
         }
 
         function getInitialView() {
+            registerBackgroundReceiver();
             return [new MedProbeView()];
+        }
+
+        // Without this registration the system never wakes MedProbeServiceDelegate, and
+        // readings only arrive while the app is open. It persists across app restarts, so
+        // it is enough that the app has been opened once. getInitialView only runs in the
+        // foreground process, which is where the registration has to happen.
+        function registerBackgroundReceiver() as Void {
+            if ((Toybox has :Background) && (Background has :registerForPhoneAppMessageEvent)) {
+                Background.registerForPhoneAppMessageEvent();
+            }
         }
 
         // Registers the background service, so readings arrive while the app is closed.

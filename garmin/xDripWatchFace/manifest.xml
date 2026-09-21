@@ -2,7 +2,7 @@
 <iq:manifest xmlns:iq="http://www.garmin.com/xml/connectiq" version="3">
     <iq:application
         id="b1c2d3e4f5a647589a0b1c2d3e4f5072"
-        type="watch-face"
+        type="watchface"
         name="@Strings.AppName"
         entry="xDripFace.xDripWatchFaceApp"
         launcherIcon="@Drawables.LauncherIcon"
