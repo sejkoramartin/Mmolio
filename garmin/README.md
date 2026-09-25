@@ -72,6 +72,8 @@ Ciferník při každém překreslení počítá `now − measuredAt`, nezávisle
 Limit je zkontrolován i při minutových aktualizacích ciferníku v úsporném režimu; změna
 stavu se tak projeví nejpozději při následujícím překreslení. Režim AMOLED sleep zmenší
 čas a glykemii, skryje sekundární údaje a posouvá obsah; informace o stáří zůstává vidět.
+Přechod na zjednodušený vzhled se řídí skutečným stavem displeje Garminu; oznámení
+`onEnterSleep` samo už nevynutí jeho překreslení, dokud displej ještě svítí naplno.
 Bridge má při otevřené obrazovce vlastní obnovu po 30 s, takže stará hodnota nezůstane
 bez označení ani při dlouho otevřené aplikaci bez nových zpráv.
 

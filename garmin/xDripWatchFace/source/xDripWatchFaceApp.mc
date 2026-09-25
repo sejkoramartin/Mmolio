@@ -1,6 +1,7 @@
 using Toybox.Application;
 using Toybox.Complications;
 using Toybox.Lang;
+using Toybox.System;
 using Toybox.WatchUi;
 
 module xDripFace {
@@ -25,6 +26,13 @@ module xDripFace {
 
         function onComplicationChanged(id as Complications.Id) as Void {
             WatchUi.requestUpdate();
+        }
+
+        function onDisplayModeChanged() as Void {
+            // Draw the reduced AMOLED face only after the screen is actually dim.
+            if (System.getDisplayMode() != System.DISPLAY_MODE_OFF) {
+                WatchUi.requestUpdate();
+            }
         }
 
         // Never fall back to the old display string: it has no measurement time.

@@ -34,10 +34,13 @@ module xDripFace {
             mSleepGlucoseFont = font(48, Graphics.FONT_NUMBER_MILD);
         }
 
-        function onEnterSleep() as Void { mSleeping = true; WatchUi.requestUpdate(); }
-        function onExitSleep() as Void { mSleeping = false; WatchUi.requestUpdate(); }
+        // Garmin calls this before the AMOLED display has actually dimmed.
+        // Redrawing here makes the reduced face flash while the screen is still bright.
+        function onEnterSleep() as Void { }
+        function onExitSleep() as Void { WatchUi.requestUpdate(); }
 
         function onUpdate(dc as Graphics.Dc) as Void {
+            mSleeping = System.getDisplayMode() == System.DISPLAY_MODE_LOW_POWER;
             var now = Time.now().value();
             var clock = System.getClockTime();
             var sample = getApp().currentGlucoseSample();
