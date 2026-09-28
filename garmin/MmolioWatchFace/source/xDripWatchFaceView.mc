@@ -15,7 +15,7 @@ module xDripFace {
         static const COLOR_OUT_OF_RANGE = 0xFF4444;
         static const COLOR_UNTRUSTED = 0x888888;
 
-        static const RIM_WIDTH = 3;
+        static const RIM_WIDTH = 5;
         // A lap of the rim: out of range runs twice as fast, awake and asleep alike.
         static const AWAKE_LAP_MS = 10000;
         static const SLEEP_STEP_DEGREES = 6;
@@ -110,10 +110,13 @@ module xDripFace {
             // Small minute-based movement and reduced content in AMOLED sleep.
             var shift = mSleeping ? ((now / 60) % 3 - 1) * 4 : 0;
             cx += shift;
-            if (!mSleeping) {
-                text(dc, cx - 102, 49, mSmallFont, dateText, 0xAAAAAA, Graphics.TEXT_JUSTIFY_LEFT);
-                text(dc, cx + 102, 49, mSmallFont, battery.format("%d") + "%", 0xAAAAAA, Graphics.TEXT_JUSTIFY_RIGHT);
-            }
+            // Secondary values stay readable in always-on, only dimmed and moving with
+            // the rest: a few thousand lit pixels at this brightness are far below what
+            // the AMOLED always-on budget allows.
+            var secondary = mSleeping ? 0x555555 : 0xAAAAAA;
+            text(dc, cx - 102, 49 + shift, mSmallFont, dateText, secondary, Graphics.TEXT_JUSTIFY_LEFT);
+            text(dc, cx + 102, 49 + shift, mSmallFont, battery.format("%d") + "%", secondary,
+                Graphics.TEXT_JUSTIFY_RIGHT);
             text(dc, cx, 123 + shift, timeFont, timeText,
                 mSleeping ? 0x777777 : Graphics.COLOR_WHITE, Graphics.TEXT_JUSTIFY_CENTER);
 
@@ -132,11 +135,9 @@ module xDripFace {
             var unit = sample == null ? "" : sample.unitText() + "  ";
             text(dc, cx, 267 + shift, mSmallFont, unit + status,
                 stale ? 0xBBBBBB : 0x888888, Graphics.TEXT_JUSTIFY_CENTER);
-            if (!mSleeping) {
-                // The native current-HR complication returns null when unavailable.
-                metric(dc, cx - 80, heart == null || heart == 0 ? "--" : heart.format("%d"), "BPM");
-                metric(dc, cx + 80, steps == null ? "--" : steps.format("%d"), "STEPS");
-            }
+            // The native current-HR complication returns null when unavailable.
+            metric(dc, cx - 80, shift, heart == null || heart == 0 ? "--" : heart.format("%d"), "BPM");
+            metric(dc, cx + 80, shift, steps == null ? "--" : steps.format("%d"), "STEPS");
         }
 
         // Awake: the whole rim glows in the range colour with a brighter head running
@@ -185,11 +186,13 @@ module xDripFace {
             dc.drawText(x, y, font, value, alignment | Graphics.TEXT_JUSTIFY_VCENTER);
         }
 
-        function metric(dc as Graphics.Dc, x as Lang.Number, value as Lang.String, label as Lang.String) as Void {
+        function metric(dc as Graphics.Dc, x as Lang.Number, shift as Lang.Number, value as Lang.String, label as Lang.String) as Void {
             // Fit even a six-digit daily step count in its half of the round face.
             var metricFont = dc.getTextWidthInPixels(value, mMetricFont) > 130 ? mSmallFont : mMetricFont;
-            text(dc, x, 317, metricFont, value, 0xEEEEEE, Graphics.TEXT_JUSTIFY_CENTER);
-            text(dc, x, 345, mLabelFont, label, 0x888888, Graphics.TEXT_JUSTIFY_CENTER);
+            text(dc, x, 317 + shift, metricFont, value, mSleeping ? 0x666666 : 0xEEEEEE,
+                Graphics.TEXT_JUSTIFY_CENTER);
+            text(dc, x, 345 + shift, mLabelFont, label, mSleeping ? 0x444444 : 0x888888,
+                Graphics.TEXT_JUSTIFY_CENTER);
         }
 
         // Geometric arrows work with every firmware font. Unknown never means flat.
