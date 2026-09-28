@@ -2,5 +2,5 @@
 # compiled in unchanged so both receivers accept exactly the same readings.
 project.manifest = manifest.xml
 
-base.sourcePath = source;../shared;../MedProbeWatch/source/GlucoseReading.mc;../MedProbeWatch/source/GlucoseStore.mc
+base.sourcePath = source;../shared;../MmolioBridge/source/GlucoseReading.mc;../MmolioBridge/source/GlucoseStore.mc
 base.resourcePath = resources

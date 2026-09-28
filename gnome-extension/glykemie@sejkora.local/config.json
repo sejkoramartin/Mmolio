@@ -1,0 +1,36 @@
+{
+  "_comment": "Načítá se za běhu – po uložení se změna projeví hned, bez odhlašování.",
+
+  "refreshSeconds": 60,
+  "lowMmol": 4.2,
+  "highMmol": 9.5,
+  "staleMinutes": 12,
+
+  "panelEnabled": false,
+
+  "hudEnabled": true,
+  "hudClickable": true,
+  "hudMonitor": -1,
+  "hudCorner": "bottom-right",
+  "hudMarginX": 200,
+  "hudMarginY": 14,
+  "hudValueSize": 30,
+  "hudArrowSize": 26,
+  "hudShowAge": false,
+  "hudAgeSize": 20,
+  "hudBackground": false,
+  "hudOpacity": 1,
+
+  "alertEnabled": true,
+  "alertMonitor": -1,
+  "alertValueSize": 160,
+  "alertTitleSize": 48,
+  "alertSound": true,
+  "alertSoundName": "alarm-clock-elapsed",
+  "alertSoundRepeatSeconds": 8,
+  "alertPulse": true,
+  "alertAutoHideMinutes": 0,
+
+  "notifyCooldownMinutes": 15,
+  "errorsBeforeNotify": 5
+}

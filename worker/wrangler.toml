@@ -1,0 +1,26 @@
+name = "glykemie"
+main = "worker.js"
+# Musí být novější než podpora Secrets Store v runtime – se starým datem
+# (měli jsme 2024-01-01) se binding vytvoří jako obecný Fetcher a `.get()`
+# spadne na "parameter 1 is not of type 'string'".
+compatibility_date = "2026-05-01"
+
+# Po spuštění `wrangler kv:namespace create TOKEN_KV`
+# sem vlož vrácené "id"
+kv_namespaces = [
+  { binding = "TOKEN_KV", id = "81d26f2ffc7c42fca4610723a5cb5aba" }
+]
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+
+# DŮLEŽITÉ: tyhle bindingy musí být tady, ne jen naklikané v dashboardu.
+# `wrangler deploy` odstraní z workeru všechny bindingy, které nenajde
+# v tomhle souboru – přesně tím nám v 9/2026 přestala fungovat glykemie
+# (worker jel dál z tokenu v KV, chyba se projevila až po změně hesla).
+[[secrets_store_secrets]]
+binding = "NIGHTSCOUT_API_SECRET"
+store_id = "d8f3852ac89646d0a200cd14a5fd34f1"
+secret_name = "NIGHTSCOUT_API_SECRET"

@@ -6,8 +6,8 @@
 #
 set -euo pipefail
 
-root=garmin/MedProbeWatch
-face=garmin/xDripWatchFace
+root=garmin/MmolioBridge
+face=garmin/MmolioWatchFace
 field=garmin/MmolioDataField
 
 echo "=== project structure ==="
@@ -53,8 +53,8 @@ python3 - <<'PYEOF'
 import sys, xml.etree.ElementTree as ET
 ns = {"iq": "http://www.garmin.com/xml/connectiq"}
 expected = {
-    "garmin/MedProbeWatch/manifest.xml": ("a1b2c3d4e5f647589a0b1c2d3e4f5061", "watch-app", None),
-    "garmin/xDripWatchFace/manifest.xml": ("b1c2d3e4f5a647589a0b1c2d3e4f5072", "watchface", None),
+    "garmin/MmolioBridge/manifest.xml": ("a1b2c3d4e5f647589a0b1c2d3e4f5061", "watch-app", None),
+    "garmin/MmolioWatchFace/manifest.xml": ("b1c2d3e4f5a647589a0b1c2d3e4f5072", "watchface", None),
     "garmin/MmolioDataField/manifest.xml": ("7ca56fd800634cab90f28d5e72be2e05", "datafield", "5.0.0"),
 }
 failed = False
@@ -105,27 +105,26 @@ test -d "$root/resources-fr165" || { echo "::error::fr165 resources missing"; ex
 echo "OK: every declared device resolves, and resources for both targets exist."
 
 echo
-echo "=== wire protocol matches the phone ==="
-SWIFT=MedProbe/Garmin/GarminMessage.swift
+echo "=== wire protocol matches the contract ==="
+# The sender lives in the xDrip4iOS fork, so the contract itself is the reference here.
+CONTRACT=garmin/wire-protocol.md
 MONKEY="$root/source/GlucoseReading.mc"
 
-swift_version=$(grep -oE 'currentVersion = [0-9]+' "$SWIFT" | grep -oE '[0-9]+')
+contract_version=$(grep -oE '^ +version = [0-9]+' "$CONTRACT" | grep -oE '[0-9]+')
 monkey_version=$(grep -oE 'SUPPORTED_VERSION = [0-9]+' "$MONKEY" | grep -oE '[0-9]+')
-echo "protocol version: Swift=$swift_version MonkeyC=$monkey_version"
-[ "$swift_version" = "$monkey_version" ] || {
-  echo "::error::Protocol version differs between phone and watch"; exit 1; }
+echo "protocol version: contract=$contract_version MonkeyC=$monkey_version"
+[ "$contract_version" = "$monkey_version" ] || {
+  echo "::error::Protocol version differs between the contract and the watch"; exit 1; }
 
-for pair in 'version:v' 'mgdl:g' 'trend:t' 'measuredAt:m' 'source:s' 'sequence:q'; do
-  name=${pair%%:*}
-  key=${pair##*:}
-  grep -q "static let $name = \"$key\"" "$SWIFT" || {
-    echo "::error::Swift key for $name is not \"$key\""; exit 1; }
+for key in v g t m s q; do
+  grep -qE "^\| \`$key\` \|" "$CONTRACT" || {
+    echo "::error::The contract does not define the key \"$key\""; exit 1; }
   grep -qE "KEY_[A-Z_]+ = \"$key\"" "$MONKEY" || {
     echo "::error::Monkey C is missing the key \"$key\""; exit 1; }
 done
 # Mmolio DataField must parse the phone packet with Bridge's own files, not a copy.
 for shared in GlucoseReading GlucoseStore; do
-  grep -q "\.\./MedProbeWatch/source/$shared.mc" "$field/monkey.jungle" || {
+  grep -q "\.\./MmolioBridge/source/$shared.mc" "$field/monkey.jungle" || {
     echo "::error::Mmolio DataField does not compile Bridge's $shared.mc"; exit 1; }
   test ! -e "$field/source/$shared.mc" || {
     echo "::error::Mmolio DataField has its own copy of $shared.mc"; exit 1; }

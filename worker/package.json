@@ -1,0 +1,11 @@
+{
+  "name": "glupro",
+  "version": "1.0.0",
+  "description": "Displej glykemie pro iPhone XS napájený z Cloudflare Worker proxy nad LibreLinkUp API.",
+  "main": "worker.js",
+  "private": true,
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "wrangler": "^4.124.0"
+  }
+}

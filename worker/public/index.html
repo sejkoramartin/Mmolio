@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black" />
+<meta name="mobile-web-app-capable" content="yes" />
+<title>Glykemie</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%; height: 100%;
+    background: #000;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  #screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    transition: background-color 0.4s ease;
+  }
+  #value {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4vw;
+    line-height: 1;
+  }
+  #number {
+    font-size: 28vw;
+    font-weight: 700;
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+  }
+  #arrow {
+    font-size: 20vw;
+    font-weight: 700;
+    color: #fff;
+  }
+  #meta {
+    margin-top: 2vh;
+    font-size: 3vw;
+    color: rgba(255,255,255,0.5);
+    letter-spacing: 0.05em;
+  }
+  #error {
+    position: absolute;
+    bottom: 2vh;
+    font-size: 2.5vw;
+    color: #ff6666;
+    display: none;
+  }
+</style>
+</head>
+<body>
+  <div id="screen">
+    <div id="value">
+      <div id="number">--</div>
+      <div id="arrow">·</div>
+    </div>
+    <div id="meta">načítám…</div>
+  </div>
+  <div id="error"></div>
+
+<script>
+  // Stejný Worker servíruje statiku i API, takže stačí relativní cesta.
+  const WORKER_URL = "/api/glucose";
+
+  const REFRESH_MS = 60_000; // jak často se ptát (worker si drží krátkou cache)
+  const STALE_MIN  = 12;     // Dexcom G7 vysílá po 5 min, takže 12 = dvě zmeškaná
+
+  const $number = document.getElementById("number");
+  const $arrow  = document.getElementById("arrow");
+  const $meta   = document.getElementById("meta");
+  const $screen = document.getElementById("screen");
+  const $error  = document.getElementById("error");
+
+  function colorForValue(mmol) {
+    return (mmol >= 4.2 && mmol <= 9.5) ? "#33cc55" : "#ff4444";
+  }
+
+  function minutesAgo(timestamp) {
+    // LibreLinkUp timestamp formát: "5/21/2022 3:38:50 PM"
+    const t = new Date(timestamp);
+    if (isNaN(t)) return null;
+    return Math.round((Date.now() - t.getTime()) / 60000);
+  }
+
+  async function refresh() {
+    try {
+      const res = await fetch(WORKER_URL, { cache: "no-store" });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      $number.textContent = data.mmol.toFixed(1).replace(".", ",");
+      $arrow.textContent = data.trendSymbol;
+      const color = colorForValue(data.mmol);
+      $number.style.color = color;
+      $arrow.style.color = color;
+
+      const age = minutesAgo(data.timestamp);
+      if (age !== null) {
+        $meta.textContent = age <= 1 ? "právě teď" : `před ${age} min`;
+        $meta.style.color = age > STALE_MIN ? "#ff9966" : "rgba(255,255,255,0.5)";
+      }
+      $error.style.display = "none";
+    } catch (e) {
+      $error.textContent = "chyba: " + e.message;
+      $error.style.display = "block";
+    }
+  }
+
+  refresh();
+  setInterval(refresh, REFRESH_MS);
+
+  // Zabránit zhasnutí displeje, pokud to prohlížeč podporuje
+  if ("wakeLock" in navigator) {
+    let wakeLock = null;
+    const requestWakeLock = async () => {
+      try { wakeLock = await navigator.wakeLock.request("screen"); } catch (e) {}
+    };
+    requestWakeLock();
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") requestWakeLock();
+    });
+  }
+</script>
+</body>
+</html>

@@ -21,9 +21,9 @@ fi
 out="$repo/build/fr165/$mode"
 mkdir -p -- "$out"
 cd -- "$repo"
-"$sdk/bin/monkeyc" -f garmin/MedProbeWatch/monkey.jungle -d fr165 \
+"$sdk/bin/monkeyc" -f garmin/MmolioBridge/monkey.jungle -d fr165 \
     -o "$out/MmolioBridge.prg" -y "$key" -l 2 "${flags[@]}"
-"$sdk/bin/monkeyc" -f garmin/xDripWatchFace/monkey.jungle -d fr165 \
+"$sdk/bin/monkeyc" -f garmin/MmolioWatchFace/monkey.jungle -d fr165 \
     -o "$out/MmolioWatchFace.prg" -y "$key" -l 2 "${flags[@]}"
 "$sdk/bin/monkeyc" -f garmin/MmolioDataField/monkey.jungle -d fr165 \
     -o "$out/MmolioDataField.prg" -y "$key" -l 2 "${flags[@]}"

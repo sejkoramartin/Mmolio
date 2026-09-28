@@ -10,12 +10,12 @@ on:
   push:
     paths:
       - 'garmin/**'
-      - 'MedProbe/Garmin/**'
+      - 'garmin/wire-protocol.md'
       - '.github/workflows/garmin-checks.yml'
   pull_request:
     paths:
       - 'garmin/**'
-      - 'MedProbe/Garmin/**'
+      - 'garmin/wire-protocol.md'
   workflow_dispatch:
 
 jobs:
