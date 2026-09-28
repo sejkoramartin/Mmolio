@@ -125,15 +125,16 @@ Garmin po instalaci také přiřazení pole k aktivitám.
 
 ## Build s SDK 9.2.0
 
-Předpoklady: Java, **Connect IQ SDK 9.2.0**, definice zařízení **fr165** v SDK Manageru a
-**stávající** vývojářský `.der` klíč použitý u nainstalovaných aplikací. Klíč necommitovat.
+Předpoklady: Java, **Connect IQ SDK 9.2.0**, definice zařízení **fr165** v SDK Manageru
+a vývojářský `.der` klíč. Všechny tři aplikace musí být podepsané **stejným** klíčem,
+jinak ciferník ani pole neuvidí privátní complication Bridge. Klíč do repozitáře nepatří.
 FR255 resources zůstávají připravené, ale tento build cílí pouze na FR165.
 
 Z kořene repozitáře na Linuxu (na tomto PC jsou tyto cesty již dostupné):
 
 ```bash
 export CONNECTIQ_SDK="$HOME/.Garmin/ConnectIQ/Sdks/connectiq-sdk-lin-9.2.0"
-export DEVELOPER_KEY="$HOME/Stažené/MedProbe-garmin/developer_key.der"
+export DEVELOPER_KEY="/cesta/k/vasemu/developer_key.der"
 ./garmin/scripts/build-fr165.sh
 ```
 

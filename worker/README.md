@@ -15,7 +15,7 @@ xDrip4iOS → POST /api/v1/entries → Worker → /api/glucose → displeje
 
 Settings → Nightscout:
 
-- **URL:** `https://glykemie.sejkoramartin.workers.dev`
+- **URL:** `https://glykemie.VASE-JMENO.workers.dev`
 - **API_SECRET:** hodnota secretu `NIGHTSCOUT_API_SECRET` (minimálně 12 znaků)
 - zapnout nahrávání
 
@@ -29,17 +29,17 @@ npm install
 npx wrangler login
 
 npx wrangler kv namespace create TOKEN_KV
-# vrácené id vlož do wrangler.toml (kv_namespaces -> id)
+# zkopíruj wrangler.toml na wrangler.local.toml a vlož vrácené id (kv_namespaces -> id)
 
 # tajemství pro xDrip (zeptá se interaktivně)
 npx wrangler secrets-store secret create <STORE_ID> \
   --name NIGHTSCOUT_API_SECRET --scopes workers --remote
-# id storu vlož do wrangler.toml (secrets_store_secrets -> store_id)
+# id storu vlož do wrangler.local.toml (secrets_store_secrets -> store_id)
 
-npx wrangler deploy
+npx wrangler deploy -c wrangler.local.toml
 ```
 
-**Bindingy musí být ve `wrangler.toml`, ne jen naklikané v dashboardu.**
+**Bindingy musí být ve `wrangler.local.toml`, ne jen naklikané v dashboardu.**
 `wrangler deploy` z workeru odstraní všechno, co v konfiguráku nenajde –
 přesně tím nám v 8/2026 přestala fungovat glykemie.
 
@@ -47,13 +47,13 @@ přesně tím nám v 8/2026 přestala fungovat glykemie.
 
 ```bash
 # test proti živým bindingům, ale bez zásahu do produkce
-npx wrangler dev --remote
+npx wrangler dev --remote -c wrangler.local.toml
 
 # nasazení
-npx wrangler deploy
+npx wrangler deploy -c wrangler.local.toml
 
 # kontrola
-curl -s https://glykemie.sejkoramartin.workers.dev/api/glucose
+curl -s https://glykemie.VASE-JMENO.workers.dev/api/glucose
 ```
 
 ## 4) Na iPhonu

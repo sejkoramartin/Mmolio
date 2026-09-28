@@ -27,3 +27,7 @@ private_keys/
 
 # macOS
 .DS_Store
+
+# Osobní nastavení – v repu je jen vzor (config.example.json, wrangler.toml)
+gnome-extension/glykemie@sejkora.local/config.json
+worker/wrangler.local.toml

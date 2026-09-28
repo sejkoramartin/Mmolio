@@ -14,10 +14,10 @@ na push z xDrip4iOS. Od téhož dne je projekt součástí repa `sejkoramartin/M
 
 | | |
 |---|---|
-| Worker | `glykemie` na `https://glykemie.sejkoramartin.workers.dev` |
-| KV namespace | `TOKEN_KV`, id `81d26f2ffc7c42fca4610723a5cb5aba` |
+| Worker | `glykemie` na `https://glykemie.VASE-JMENO.workers.dev` |
+| KV namespace | `TOKEN_KV`, id `<ID-VASEHO-KV>` |
 | KV klíč s daty | `ns_latest` – poslední měření |
-| Secrets Store | id `d8f3852ac89646d0a200cd14a5fd34f1` |
+| Secrets Store | id `<ID-VASEHO-SECRETS-STORE>` |
 | Jediný secret | `NIGHTSCOUT_API_SECRET` |
 | GNOME rozšíření | `~/.local/share/gnome-shell/extensions/glykemie@sejkora.local` → **symlink** do `gnome-extension/` v projektu |
 
@@ -58,11 +58,11 @@ garmin/                   aplikace pro hodinky Garmin
 
 ```bash
 # aktuální hodnota
-curl -s https://glykemie.sejkoramartin.workers.dev/api/glucose
+curl -s https://glykemie.VASE-JMENO.workers.dev/api/glucose
 
 # cizí zápis musí být odmítnut (čekej 401)
 curl -s -o /dev/null -w "%{http_code}\n" \
-  -X POST https://glykemie.sejkoramartin.workers.dev/api/v1/entries -d '[]'
+  -X POST https://glykemie.VASE-JMENO.workers.dev/api/v1/entries -d '[]'
 ```
 
 Když `/api/glucose` vrátí **503**, znamená to, že ještě nedorazilo žádné měření –

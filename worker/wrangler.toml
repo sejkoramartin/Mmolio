@@ -1,3 +1,6 @@
+# Vzor. Zkopíruj na wrangler.local.toml, doplň svá ID a nasazuj s
+#   npx wrangler deploy -c wrangler.local.toml
+# Vlastní soubor je v .gitignore, ať se tvoje ID nedostanou do repozitáře.
 name = "glykemie"
 main = "worker.js"
 # Musí být novější než podpora Secrets Store v runtime – se starým datem
@@ -8,7 +11,7 @@ compatibility_date = "2026-05-01"
 # Po spuštění `wrangler kv:namespace create TOKEN_KV`
 # sem vlož vrácené "id"
 kv_namespaces = [
-  { binding = "TOKEN_KV", id = "81d26f2ffc7c42fca4610723a5cb5aba" }
+  { binding = "TOKEN_KV", id = "<ID-VASEHO-KV>" }
 ]
 
 [assets]
@@ -22,5 +25,5 @@ binding = "ASSETS"
 # (worker jel dál z tokenu v KV, chyba se projevila až po změně hesla).
 [[secrets_store_secrets]]
 binding = "NIGHTSCOUT_API_SECRET"
-store_id = "d8f3852ac89646d0a200cd14a5fd34f1"
+store_id = "<ID-VASEHO-SECRETS-STORE>"
 secret_name = "NIGHTSCOUT_API_SECRET"

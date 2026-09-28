@@ -23,10 +23,15 @@ Pro worker a GNOME rozšíření platí navíc `worker/CLAUDE.md`, pro hodinky `
 3. **Hesla, tokeny a klíče nikdy do repa ani do chatu.** Podpisový klíč pro Garmin leží
    mimo repo (`~/Stažené/MedProbe-garmin/developer_key.der`), Cloudflare tajemství
    v Secrets Store. Interaktivní příkazy, které se ptají na tajné hodnoty, patří uživateli.
-4. **Bindingy Cloudflare patří do `worker/wrangler.toml`**, ne do dashboardu; `deploy`
-   smaže všechno, co v konfiguráku nenajde.
+4. **Bindingy Cloudflare patří do konfiguráku**, ne do dashboardu; `deploy` smaže
+   všechno, co v něm nenajde. V repu je vzor `worker/wrangler.toml` s placeholdery,
+   skutečná ID jsou v `worker/wrangler.local.toml` mimo git: `deploy -c wrangler.local.toml`.
+   Stejně tak `gnome-extension/.../config.json` je osobní a mimo git, v repu je
+   `config.example.json`.
 5. **Změny se ověřují lokálně, ne v CI.** GitHub Actions se šetří.
-6. **Komunikace je česky.**
+6. **Repo je veřejné pod GPL-3.0.** Do repa nepatří adresa workeru, ID účtu ani nic
+   osobního – všude jen příklady. Veřejná dokumentace je česky v `docs/`.
+7. **Komunikace je česky.**
 
 ## Jak se dělají změny
 

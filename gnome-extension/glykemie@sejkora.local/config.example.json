@@ -1,5 +1,6 @@
 {
-  "_comment": "Načítá se za běhu – po uložení se změna projeví hned, bez odhlašování.",
+  "_comment": "Zkopíruj na config.json a doplň adresu svého workeru. Načítá se za běhu – po uložení se změna projeví hned, bez odhlašování.",
+  "workerUrl": "https://glykemie.VASE-JMENO.workers.dev",
   "refreshSeconds": 60,
   "lowMmol": 4.2,
   "highMmol": 9.5,

@@ -9,7 +9,7 @@
 // vlastního Nightscoutu s databází.
 //
 // Nastavení v xDrip4iOS (Settings -> Nightscout):
-//   URL         https://glykemie.sejkoramartin.workers.dev
+//   URL         https://glykemie.VASE-JMENO.workers.dev
 //   API_SECRET  hodnota secretu NIGHTSCOUT_API_SECRET (min. 12 znaků)
 //
 // Ověřeno proti zdrojovému kódu xDrip4iOS (NightscoutSyncManager.swift,

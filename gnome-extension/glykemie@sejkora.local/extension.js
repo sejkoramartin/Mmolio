@@ -18,8 +18,8 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import * as MessageTray from 'resource:///org/gnome/shell/ui/messageTray.js';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
-const PAGE_URL = 'https://glykemie.sejkoramartin.workers.dev';
-const API_URL = `${PAGE_URL}/api/glucose`;
+// Adresa vlastního workeru; nastavuje se v config.json, ne v kódu.
+const DEFAULT_PAGE_URL = 'https://glykemie.VASE-JMENO.workers.dev';
 
 const COLOR_OK = '#33cc55';
 const COLOR_ALERT = '#ff4444';
@@ -27,6 +27,7 @@ const COLOR_STALE = 'rgba(255,255,255,0.5)';
 
 // Použije se, když config.json chybí nebo je rozbitý.
 const DEFAULTS = {
+    workerUrl: DEFAULT_PAGE_URL,
     refreshSeconds: 60,
     lowMmol: 4.2,
     highMmol: 9.5,
@@ -240,7 +241,7 @@ class GlykemieMonitor {
 
         const openItem = new PopupMenu.PopupMenuItem('Otevřít displej v prohlížeči');
         openItem.connect('activate', () => {
-            Gio.AppInfo.launch_default_for_uri(PAGE_URL, null);
+            Gio.AppInfo.launch_default_for_uri(this._cfg.workerUrl, null);
         });
         menu.addMenuItem(openItem);
     }
@@ -581,7 +582,7 @@ class GlykemieMonitor {
     // ---------- data ----------
 
     _refresh() {
-        const message = Soup.Message.new('GET', API_URL);
+        const message = Soup.Message.new('GET', `${this._cfg.workerUrl}/api/glucose`);
         if (!message) {
             this._onError('neplatná URL');
             return;

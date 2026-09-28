@@ -4,5 +4,5 @@
   "description": "Ukazuje aktuální glykemii z LibreLinkUp v horní liště a upozorní při hypo/hyper.",
   "version": 1,
   "shell-version": ["50"],
-  "url": "https://glykemie.sejkoramartin.workers.dev"
+  "url": "https://github.com/sejkoramartin/Mmolio"
 }

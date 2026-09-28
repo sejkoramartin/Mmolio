@@ -37,12 +37,12 @@ službám.
 
 ## Stav (funkční, ověřeno 28. 9. 2026)
 
-- Jeden Worker `glykemie.sejkoramartin.workers.dev` servíruje frontend
+- Jeden Worker `glykemie.VASE-JMENO.workers.dev` servíruje frontend
   i backend
 - KV namespace `TOKEN_KV`, klíč `ns_latest` – poslední měření
 - Secret `NIGHTSCOUT_API_SECRET` v Cloudflare **Secrets Store**
 - Nastavení v xDrip4iOS → Settings → Nightscout:
-  URL `https://glykemie.sejkoramartin.workers.dev`, API_SECRET = ten secret
+  URL `https://glykemie.VASE-JMENO.workers.dev`, API_SECRET = ten secret
 - `index.html` obarvuje číslo: zelená 4,2–9,5 mmol/L, jinak červená
 - Wake Lock API použit k potlačení zhasínání (funguje jen omezeně na
   iOS Safari – primární obrana je stejně auto-zámek Nikdy + Guided Access)

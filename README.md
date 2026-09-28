@@ -1,50 +1,60 @@
 # Mmolio
 
-Glykemie z Dexcomu G7 na hodinkách Garmin, na starém iPhonu jako displej a v liště Ubuntu.
-Tohle repo obsahuje **všechno vlastní**; xDrip4iOS je cizí projekt a žije zvlášť.
+Glykemie z kontinuálního senzoru tam, kam se běžně nedostane: na hodinkách Garmin, na
+starém telefonu jako displeji na stole a v liště Ubuntu.
+
+> ⚠️ **Mmolio není zdravotnický prostředek.** Jen zobrazuje hodnoty, které naměřil váš
+> senzor. Nerozhodujte podle něj o léčbě a nechte si zapnuté alarmy v oficiální aplikaci
+> senzoru. Přečtěte si [upozornění](docs/DISCLAIMER.md), je krátké.
 
 ```
 Dexcom G7 ──BLE──► xDrip4iOS (iPhone) ──┬──► Connect IQ ──► Garmin FR165
-       souběžně s CamAPS FX, která řeší léčbu
-                                        └──► HTTPS push ──► Cloudflare Worker ──┬──► iPhone XS displej
-                                                                                └──► GNOME rozšíření
+                                        │                   Bridge + ciferník + datové pole
+                                        └──► HTTPS ──► Cloudflare Worker ──┬──► telefon jako displej
+                                                                           └──► rozšíření do GNOME
 ```
+
+Mmolio si data nikde nebere samo, nechává si je posílat. Neptá se žádné cizí služby,
+nepotřebuje vaše heslo k senzoru a nikam nic neodesílá.
+
+## Co je uvnitř
 
 | Složka | Co to je |
 |---|---|
-| [`garmin/`](garmin/README.md) | Tři aplikace pro Forerunner 165: Bridge, WatchFace, DataField |
-| [`worker/`](worker/README.md) | Cloudflare Worker `glykemie` a displej pro iPhone |
-| `gnome-extension/` | Rozšíření GNOME – hodnota v docku a alarmy |
-| `docs/` | Návrh samostatné aplikace Mmolio a právní texty |
+| [`garmin/`](garmin/README.md) | Tři aplikace pro Forerunner 165: **Mmolio Bridge** přijímá měření z telefonu i na pozadí, **Mmolio WatchFace** je ciferník, **Mmolio DataField** datové pole do aktivit |
+| [`worker/`](worker/README.md) | Cloudflare Worker, který se tváří jako Nightscout, přijímá měření a servíruje displej i `/api/glucose` |
+| `gnome-extension/` | Rozšíření GNOME: hodnota v docku, barvy podle rozsahu a stáří, volitelné upozornění |
+| [`docs/`](docs/INSTALL.md) | Instalace, FAQ, právní upozornění |
 
-## Kde je co
-
-**Hodinky.** `garmin/MmolioBridge` přijímá měření z telefonu i na pozadí a publikuje je jako
-complication. `garmin/MmolioWatchFace` je ciferník, `garmin/MmolioDataField` datové pole pro
-aktivity. Build a testy: `garmin/scripts/build-fr165.sh`, podrobnosti v `garmin/README.md`.
-
-**Odesílatel do hodinek není tady.** Je to fork xDrip4iOS
+Odesílatel do hodinek tady není. Je to fork xDrip4iOS
 [`sejkoramartin/xdripswift`](https://github.com/sejkoramartin/xdripswift), větev
-`feature/garmin-watch`, složka `xDrip/Managers/Garmin/`. Jde o fork cizího GPL projektu,
-který se musí synchronizovat s upstreamem, proto zůstává samostatný. Formát zpráv mezi
-telefonem a hodinkami je zapsaný v [`garmin/wire-protocol.md`](garmin/wire-protocol.md).
+`feature/garmin-watch`, protože xDrip je samostatný projekt pod GPL a musí se
+synchronizovat s upstreamem. Formát zpráv mezi telefonem a hodinkami je zapsaný
+v [`garmin/wire-protocol.md`](garmin/wire-protocol.md).
 
-**Worker.** Tváří se jako Nightscout server, přijímá push z xDripu, drží poslední měření
-v KV a servíruje displej i `/api/glucose`. Nasazení a obsluha v `worker/README.md`,
-kontext a trial-and-error poznatky v `worker/CLAUDE.md`.
+## Instalace
+
+Postup krok za krokem je v [`docs/INSTALL.md`](docs/INSTALL.md): Cloudflare Worker,
+displej na telefonu, rozšíření do GNOME a hodinky Garmin. Části jsou nezávislé, postavte
+si jen to, co chcete. Když něco nefunguje, koukněte do [FAQ](docs/FAQ.md).
+
+Zveřejňuje se zdrojový kód, ne hotové balíčky. Každý si Mmolio sestaví a provozuje sám
+pro sebe, na svém účtu a se svým vývojářským klíčem.
 
 ## Pravidlo, které platí všude
 
-**Stará hodnota nikdy nesmí vypadat jako aktuální.** Proto se všude počítá stáří ze
-skutečného času měření, proto hodinky ukazují `STALE` a proto `/api/glucose` vrátí chybu,
-místo aby mlčky servíroval poslední známou hodnotu. V 8–9/2026 worker měsíc nefungoval
-a nikdo si toho nevšiml, protože displej dál ukazoval starou hodnotu.
+**Stará hodnota se nikdy netváří jako aktuální.** Stáří se počítá od okamžiku měření,
+nikdy od chvíle, kdy hodnota dorazila. Hodinky starou hodnotu zešediví, označí `STALE`
+a schovají trendovou šipku. Worker raději vrátí chybu, než aby mlčky poslal zastaralý
+údaj.
 
-## Historie
+Vzniklo to z konkrétní zkušenosti: worker tu jednou měsíc nefungoval a nikdo si toho
+nevšiml, protože displej dál ukazoval poslední známé číslo.
 
-Repo se dřív jmenovalo **MedProbe** a byla v něm iOS aplikace, která četla LibreLinkUp
-a Medtrum Nano. Od té doby data tečou z Dexcomu G7 přes xDrip4iOS, takže se aplikace
-odstranila. Poslední stav včetně jejího kódu je pod tagem `ios-medprobe-final`.
+## Licence
 
-Vnitřní názvy modulů v Monkey C (`MedProbe`, `xDripFace`) zůstaly, aby se nemusely měnit
-application ID ani ověřený přenos. Viditelné názvy na hodinkách jsou Mmolio.
+[GNU GPL v3](LICENSE). Software je poskytován bez jakékoli záruky.
+
+Dexcom, FreeStyle Libre, Garmin, Connect IQ a Cloudflare jsou ochranné známky svých
+vlastníků a používají se tu jen popisně. Mmolio není žádnou z těchto firem vyvíjené,
+podporované ani schválené.
