@@ -77,6 +77,12 @@ gnome-extensions enable glykemie@sejkora.local
 Ukazuje hodnotu na pravém konci spodního docku, kliknutím se otevře nabídka.
 Při hypo/hyper spustí alarm se zvukem.
 
+V nabídce je **přepínač „Alarm"**. Vypnutím se umlčí i alarm, který zrovna zvoní,
+a volba se uloží do `config.json` (`alertEnabled`), takže platí i po odhlášení.
+Vypíná se jen ta překryvná obrazovka se zvukem – hodnota v docku se dál barví podle
+rozsahu a upozornění v liště chodí dál. Položka „Vyzkoušet alarm" funguje i při
+vypnutém alarmu, je to vědomý úkon.
+
 **Nastavení je v `config.json` a načítá se za běhu** – pozice, velikosti, prahy
 i alarmy se dají měnit bez odhlašování. Naopak **změna `extension.js` vyžaduje
 odhlášení a přihlášení**, protože Wayland neumí rozšíření přenačíst.

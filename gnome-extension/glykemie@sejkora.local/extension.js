@@ -97,9 +97,10 @@ class GlykemiePanelButton extends PanelMenu.Button {
 });
 
 class GlykemieMonitor {
-    constructor(config, uuid) {
+    constructor(config, uuid, dir) {
         this._cfg = config;
         this._uuid = uuid;
+        this._dir = dir;
 
         this._session = new Soup.Session();
         // ať se to při zakolísání sítě nezasekne na desítky sekund
@@ -121,6 +122,7 @@ class GlykemieMonitor {
         this._alertHideId = 0;
 
         this._statusItems = [];
+        this._alarmItems = [];
 
         this._monitorsChangedId = Main.layoutManager.connect(
             'monitors-changed',
@@ -137,6 +139,12 @@ class GlykemieMonitor {
 
     // Zavolá se při každé změně config.json.
     applyConfig(config) {
+        // Změnu, kterou jsme sami zapsali (přepínač alarmu), už máme použitou –
+        // bez téhle pojistky by se kvůli ní zbytečně přestavovalo celé UI
+        // a zavírala otevřená nabídka.
+        if (JSON.stringify(config) === JSON.stringify(this._cfg))
+            return;
+
         this._cfg = config;
 
         this._destroyUi();
@@ -168,6 +176,7 @@ class GlykemieMonitor {
 
     _buildUi() {
         this._statusItems = [];
+        this._alarmItems = [];
 
         if (this._cfg.panelEnabled) {
             this._panel = new GlykemiePanelButton();
@@ -195,6 +204,7 @@ class GlykemieMonitor {
             this._panel = null;
         }
         this._statusItems = [];
+        this._alarmItems = [];
     }
 
     // Položky nabídky – stejné pro panel i pro HUD.
@@ -208,12 +218,24 @@ class GlykemieMonitor {
 
         menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
+        // Vypínač alarmu. Vypnutím se umlčí i alarm, který zrovna zvoní.
+        // Upozornění v liště a barvy hodnoty zůstávají – vypíná se jen ta
+        // překryvná obrazovka se zvukem.
+        const alarmItem = new PopupMenu.PopupSwitchMenuItem(
+            'Alarm',
+            this._cfg.alertEnabled
+        );
+        alarmItem.connect('toggled', (item, state) => this._setAlertEnabled(state));
+        menu.addMenuItem(alarmItem);
+        this._alarmItems.push(alarmItem);
+
         const refreshItem = new PopupMenu.PopupMenuItem('Obnovit teď');
         refreshItem.connect('activate', () => this._refresh());
         menu.addMenuItem(refreshItem);
 
+        // Vyzkoušení funguje i při vypnutém alarmu – je to vědomý úkon.
         const testItem = new PopupMenu.PopupMenuItem('Vyzkoušet alarm');
-        testItem.connect('activate', () => this._showAlert('low', '3,4', '↓'));
+        testItem.connect('activate', () => this._showAlert('low', '3,4', '↓', true));
         menu.addMenuItem(testItem);
 
         const openItem = new PopupMenu.PopupMenuItem('Otevřít displej v prohlížeči');
@@ -378,8 +400,59 @@ class GlykemieMonitor {
 
     // ---------- alarm ----------
 
-    _showAlert(kind, valueText, arrow) {
-        if (!this._cfg.alertEnabled)
+    // Přepínač v nabídce. Vypnutí musí zabrat okamžitě, i když alarm zrovna běží.
+    _setAlertEnabled(enabled) {
+        // setToggleState vyvolá „toggled“ znovu, takže bez téhle pojistky by se
+        // handler volal podruhé a nastavení se zapisovalo dvakrát.
+        if (this._settingAlertEnabled)
+            return;
+        this._settingAlertEnabled = true;
+
+        try {
+            this._cfg.alertEnabled = enabled;
+
+            if (!enabled)
+                this._hideAlert();
+
+            // Obě nabídky (panel i HUD) mají vlastní přepínač, ať ukazují totéž.
+            for (const item of this._alarmItems) {
+                if (item.state !== enabled)
+                    item.setToggleState(enabled);
+            }
+
+            this._saveSetting('alertEnabled', enabled);
+        } finally {
+            this._settingAlertEnabled = false;
+        }
+    }
+
+    // Zapíše jedinou hodnotu do config.json a nechá zbytek souboru být.
+    // Kdyby zápis selhal, přepínač platí aspoň do odhlášení.
+    _saveSetting(key, value) {
+        const file = this._dir?.get_child('config.json');
+        if (!file)
+            return;
+
+        try {
+            const [ok, contents] = file.load_contents(null);
+            const parsed = ok
+                ? JSON.parse(new TextDecoder('utf-8').decode(contents))
+                : {};
+            parsed[key] = value;
+            file.replace_contents(
+                new TextEncoder().encode(`${JSON.stringify(parsed, null, 2)}\n`),
+                null,
+                false,
+                Gio.FileCreateFlags.NONE,
+                null
+            );
+        } catch (e) {
+            logError(e, `Glykemie: nastavení ${key} se nepodařilo uložit`);
+        }
+    }
+
+    _showAlert(kind, valueText, arrow, force = false) {
+        if (!force && !this._cfg.alertEnabled)
             return;
 
         this._hideAlert();
@@ -732,7 +805,7 @@ class GlykemieMonitor {
 
 export default class GlykemieExtension extends Extension {
     enable() {
-        this._monitor = new GlykemieMonitor(loadConfig(this.dir), this.uuid);
+        this._monitor = new GlykemieMonitor(loadConfig(this.dir), this.uuid, this.dir);
 
         // config.json sledujeme, ať jde nastavení měnit bez odhlašování
         this._configFile = this.dir.get_child('config.json');
