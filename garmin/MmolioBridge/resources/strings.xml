@@ -7,5 +7,7 @@
     <string id="UseMmolPrompt">Off shows mg/dL instead.</string>
     <string id="StaleMinutesTitle">Mark stale after</string>
     <string id="StaleMinutesPrompt">Minutes before a reading is shown as out of date.</string>
+    <string id="LowMmolTitle">In range from</string>
+    <string id="HighMmolTitle">In range to</string>
     <string id="GlucoseSampleLongLabel">Mmolio Glucose Sample v1</string>
 </strings>

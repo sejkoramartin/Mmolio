@@ -11,6 +11,7 @@
 
 using Toybox.Application;
 using Toybox.Lang;
+using Toybox.Math;
 
 module MmolioField {
 
@@ -35,9 +36,23 @@ module MmolioField {
                 !isInteger(reading.sequence)) {
                 return null;
             }
-            return Mmolio.SampleCodec.decode("1|" + reading.mgdl.format("%d") + "|" +
+            return Mmolio.SampleCodec.decode("2|" + reading.mgdl.format("%d") + "|" +
                 reading.trend.format("%d") + "|" + reading.measuredAt.format("%d") + "|" +
-                (useMmol ? "1" : "0") + "|" + staleSeconds.format("%d"));
+                (useMmol ? "1" : "0") + "|" + staleSeconds.format("%d") + "|" +
+                limitMgdl("lowMmol", 4.2).format("%d") + "|" +
+                limitMgdl("highMmol", 9.5).format("%d"));
+        }
+
+        // An in-range limit the user set in mmol/L, as whole mg/dL. Out-of-range or
+        // missing settings fall back to the default rather than colouring from nonsense.
+        static function limitMgdl(key as Lang.String, fallbackMmol as Lang.Float) as Lang.Number {
+            var configured = Application.Properties.getValue(key);
+            var mmol = fallbackMmol;
+            if ((configured instanceof Lang.Float || configured instanceof Lang.Double ||
+                 configured instanceof Lang.Number) && configured > 1.0 && configured < 30.0) {
+                mmol = configured;
+            }
+            return Math.round(mmol * 18.0182).toNumber();
         }
 
         // Settings are the field's own, independent of Mmolio Bridge.

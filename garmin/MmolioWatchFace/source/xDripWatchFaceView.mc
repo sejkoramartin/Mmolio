@@ -4,11 +4,26 @@ using Toybox.Lang;
 using Toybox.System;
 using Toybox.Time;
 using Toybox.Time.Gregorian;
+using Toybox.Timer;
 using Toybox.WatchUi;
 
 module xDripFace {
     class xDripWatchFaceView extends WatchUi.WatchFace {
+
+        // The colours the worker and the desktop display already use.
+        static const COLOR_IN_RANGE = 0x33CC55;
+        static const COLOR_OUT_OF_RANGE = 0xFF4444;
+        static const COLOR_UNTRUSTED = 0x888888;
+
+        static const RIM_WIDTH = 3;
+        // A lap of the rim: out of range runs twice as fast, awake and asleep alike.
+        static const AWAKE_LAP_MS = 10000;
+        static const SLEEP_STEP_DEGREES = 6;
+        static const TAIL_SEGMENTS = 6;
+        static const TAIL_SEGMENT_DEGREES = 7;
+
         var mSleeping as Lang.Boolean = false;
+        var mTimer as Timer.Timer? = null;
         var mTimeFont as Graphics.FontType = Graphics.FONT_XTINY;
         var mGlucoseFont as Graphics.FontType = Graphics.FONT_XTINY;
         var mSmallFont as Graphics.FontType = Graphics.FONT_XTINY;
@@ -34,8 +49,36 @@ module xDripFace {
             mSleepGlucoseFont = font(48, Graphics.FONT_NUMBER_MILD);
         }
 
-        function onEnterSleep() as Void { mSleeping = true; WatchUi.requestUpdate(); }
-        function onExitSleep() as Void { mSleeping = false; WatchUi.requestUpdate(); }
+        // Timers exist only in high power mode, so the running head is animated while
+        // the watch is awake and steps once a minute in always-on.
+        function onShow() as Void { startAnimation(); }
+        function onHide() as Void { stopAnimation(); }
+
+        function onEnterSleep() as Void {
+            mSleeping = true;
+            stopAnimation();
+            WatchUi.requestUpdate();
+        }
+
+        function onExitSleep() as Void {
+            mSleeping = false;
+            startAnimation();
+            WatchUi.requestUpdate();
+        }
+
+        private function startAnimation() as Void {
+            if (mTimer != null || mSleeping) { return; }
+            mTimer = new Timer.Timer();
+            (mTimer as Timer.Timer).start(method(:onAnimationTick), 100, true);
+        }
+
+        private function stopAnimation() as Void {
+            if (mTimer == null) { return; }
+            (mTimer as Timer.Timer).stop();
+            mTimer = null;
+        }
+
+        function onAnimationTick() as Void { WatchUi.requestUpdate(); }
 
         function onUpdate(dc as Graphics.Dc) as Void {
             var now = Time.now().value();
@@ -56,8 +99,12 @@ module xDripFace {
             dc.clear();
             var cx = dc.getWidth() / 2;
             var stale = sample != null && sample.isStale(now);
+            var trusted = sample != null && !stale;
             var value = sample == null ? "--" : sample.valueText();
-            var color = sample == null || stale ? 0x888888 : 0x65E6CD;
+            // Range colours belong to a reading we trust; anything else stays grey.
+            var color = !trusted ? COLOR_UNTRUSTED
+                : (sample.inRange() ? COLOR_IN_RANGE : COLOR_OUT_OF_RANGE);
+            drawRim(dc, now, color, trusted, trusted && !sample.inRange());
             var timeFont = mSleeping ? mSleepTimeFont : mTimeFont;
             var glucoseFont = mSleeping ? mSleepGlucoseFont : mGlucoseFont;
             // Small minute-based movement and reduced content in AMOLED sleep.
@@ -74,10 +121,11 @@ module xDripFace {
             var width = dc.getTextWidthInPixels(value, glucoseFont);
             var totalWidth = width + (arrow ? 56 : 0);
             var left = cx - totalWidth / 2;
+            var valueColor = mSleeping ? dim(color, 45) : color;
             text(dc, left, 215 + shift, glucoseFont, value,
-                mSleeping ? 0x777777 : color, Graphics.TEXT_JUSTIFY_LEFT);
+                valueColor, Graphics.TEXT_JUSTIFY_LEFT);
             if (arrow) {
-                dc.setColor(mSleeping ? 0x777777 : color, Graphics.COLOR_BLACK);
+                dc.setColor(valueColor, Graphics.COLOR_BLACK);
                 drawTrend(dc, left + width + 29, 215 + shift, sample.trend);
             }
             var status = sample == null ? "NO DATA" : sample.ageText(now);
@@ -89,6 +137,47 @@ module xDripFace {
                 metric(dc, cx - 80, heart == null || heart == 0 ? "--" : heart.format("%d"), "BPM");
                 metric(dc, cx + 80, steps == null ? "--" : steps.format("%d"), "STEPS");
             }
+        }
+
+        // Awake: the whole rim glows in the range colour with a brighter head running
+        // around it. Always-on: only the head and its fading tail, one step per minute,
+        // so nothing on the rim stays lit — the rule AMOLED burn-in protection applies.
+        function drawRim(dc as Graphics.Dc, now as Lang.Number or Lang.Long, color as Lang.Number,
+                trusted as Lang.Boolean, fast as Lang.Boolean) as Void {
+            if (!trusted) { return; }
+
+            var centerX = dc.getWidth() / 2;
+            var centerY = dc.getHeight() / 2;
+            var radius = centerX - (RIM_WIDTH + 1) / 2;
+            var head;
+
+            dc.setPenWidth(RIM_WIDTH);
+            if (!mSleeping) {
+                dc.setColor(dim(color, 35), Graphics.COLOR_BLACK);
+                dc.drawCircle(centerX, centerY, radius);
+                var lap = fast ? AWAKE_LAP_MS / 2 : AWAKE_LAP_MS;
+                head = 90 - (System.getTimer() % lap) * 360 / lap;
+            } else {
+                var step = fast ? SLEEP_STEP_DEGREES * 2 : SLEEP_STEP_DEGREES;
+                head = 90 - ((now / 60) * step) % 360;
+            }
+
+            // Drawn from the head backwards, each segment dimmer than the one before.
+            for (var i = 0; i < TAIL_SEGMENTS; i += 1) {
+                var brightness = 100 - i * (100 / TAIL_SEGMENTS);
+                dc.setColor(dim(color, brightness), Graphics.COLOR_BLACK);
+                dc.drawArc(centerX, centerY, radius, Graphics.ARC_COUNTER_CLOCKWISE,
+                    head + i * TAIL_SEGMENT_DEGREES, head + (i + 1) * TAIL_SEGMENT_DEGREES);
+            }
+            dc.setPenWidth(1);
+        }
+
+        // percent 0-100 of the original colour, on black.
+        function dim(color as Lang.Number, percent as Lang.Number) as Lang.Number {
+            var red = ((color >> 16) & 0xFF) * percent / 100;
+            var green = ((color >> 8) & 0xFF) * percent / 100;
+            var blue = (color & 0xFF) * percent / 100;
+            return (red << 16) | (green << 8) | blue;
         }
 
         function text(dc as Graphics.Dc, x as Lang.Number, y as Lang.Number, font as Graphics.FontType, value as Lang.String, color as Lang.Number, alignment as Lang.Number) as Void {

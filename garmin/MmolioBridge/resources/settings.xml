@@ -5,4 +5,10 @@
     <setting propertyKey="@Properties.staleMinutes" title="@Strings.StaleMinutesTitle">
         <settingConfig type="numeric" min="5" max="120"/>
     </setting>
+    <setting propertyKey="@Properties.lowMmol" title="@Strings.LowMmolTitle">
+        <settingConfig type="numeric" min="2" max="15"/>
+    </setting>
+    <setting propertyKey="@Properties.highMmol" title="@Strings.HighMmolTitle">
+        <settingConfig type="numeric" min="5" max="25"/>
+    </setting>
 </settings>

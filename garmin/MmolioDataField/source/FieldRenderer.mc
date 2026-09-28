@@ -52,8 +52,16 @@ module MmolioField {
             // The unit is dropped before the age whenever space runs out.
             var statuses = sample == null ? [status] : [sample.unitText() + "  " + status, status];
             var trend = sample == null || stale ? -1 : sample.trend;
-            var valueColor = sample == null || stale ? (dark ? 0x888888 : 0x777777)
-                                                     : (dark ? 0x65E6CD : 0x007A68);
+            // The colours the worker and the desktop use. A reading we cannot trust is
+            // grey whatever its value, so an old one never reads as in range.
+            var valueColor;
+            if (sample == null || stale) {
+                valueColor = dark ? 0x888888 : 0x777777;
+            } else if (sample.inRange()) {
+                valueColor = dark ? 0x33CC55 : 0x1E8C3A;
+            } else {
+                valueColor = dark ? 0xFF4444 : 0xC62828;
+            }
             var statusColor = stale ? (dark ? 0xDDDDDD : 0x222222) : (dark ? 0xAAAAAA : 0x555555);
 
             // Where the rectangle sits on screen; only the obscurity flags tell us.

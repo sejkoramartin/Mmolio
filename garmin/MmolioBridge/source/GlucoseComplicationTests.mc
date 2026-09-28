@@ -14,10 +14,15 @@ function publisherRoundTripKeepsMeasurementAndSettings(logger) {
         Test.assert(decoded.useMmol);
         Test.assertEqual(900, decoded.staleSeconds);
         Test.assert(decoded.isStale(1700000900));
+        // Default Bridge limits, 4.2 and 9.5 mmol/L, travel with the reading.
+        Test.assertEqual(76, decoded.lowMgdl);
+        Test.assertEqual(171, decoded.highMgdl);
+        Test.assert(decoded.inRange());
     }
     var reading = new MedProbe.GlucoseReading(250, 4, 1700000000, 3, 43);
     var mgdl = Mmolio.SampleCodec.decode(MedProbe.GlucoseComplication.encodeSample(reading, false, 300));
     Test.assertEqual("250", mgdl.valueText());
+    Test.assert(!mgdl.inRange());
     Test.assertEqual("mg/dL", mgdl.unitText());
     Test.assert(mgdl.isStale(1700000300));
     return true;

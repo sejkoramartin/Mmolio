@@ -2,4 +2,8 @@
     <property id="useMmol" type="boolean">true</property>
     <!-- Default freshness limit, also published to Mmolio WatchFace. -->
     <property id="staleMinutes" type="number">15</property>
+    <!-- In-range limits in mmol/L, published to Mmolio WatchFace for the value colour
+         and the rim. Same limits as the worker and the desktop display use. -->
+    <property id="lowMmol" type="float">4.2</property>
+    <property id="highMmol" type="float">9.5</property>
 </properties>
