@@ -216,8 +216,9 @@ přenos ani doručování mezi dvěma současně nainstalovanými aplikacemi.
   restartoval a načtení správného scénáře bylo ověřeno značkou v logu. Stavy: čerstvé, STALE
   (1h12m, 2h5m, 23h59m, 12d), CHECK TIME, NO DATA, neznámý trend, dvojité šipky,
   čtyřmístné mg/dL. Bez překrytí a ořezu.
-- Příjem zpráv z telefonu simulátor neověří; to zbývá na hodinkách s aktualizovaným
-  xDrip4iOS.
+- **Ověřeno na hodinkách 28. 9. 2026** s xDrip4iOS z větve `feature/garmin-watch`
+  (TestFlight 7.1.1 build 20260925): pole po zapnutí ukázalo uloženou starou hodnotu jako
+  `STALE 5d` a další měření ji přepsalo aktuální glykemií. Bridge i ciferník fungují dál.
 
 ## Nasazení aplikací přes USB – pro Claude Code
 

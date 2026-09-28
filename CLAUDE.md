@@ -57,8 +57,6 @@ a přihlášení uživatele – Wayland neumí rozšíření přenačíst.
 2. **Graf posledních hodin** z krátké historie v KV.
 3. **Mmolio pro Windows** – `docs/mmolio-navrh.md` je zastaralý, aktuální je novější verze
    (jen Windows 11, .NET 10 LTS, bez klinických alarmů kvůli MDR). Před začátkem srovnat.
-4. **Ověřit DataField na hodinkách** s aktualizovaným xDripem: zatím není potvrzené, že do
-   něj data reálně dorazí.
 
 ## Prostředí
 
