@@ -1,203 +1,99 @@
-# Instalace
+# Installation
 
-Návod krok za krokem. Nejdřív si přečtěte [upozornění](DISCLAIMER.md) – Mmolio není
-zdravotnický prostředek a nenahrazuje oficiální aplikaci vašeho senzoru ani její alarmy.
+**English** · [Čeština](INSTALL-CS.md)
 
-Části jsou nezávislé. Worker a displeje dávají smysl samy o sobě, hodinky taky.
-Postavte si jen to, co chcete.
+Read the [disclaimer](DISCLAIMER.md) first. Components are independent: install
+only the ones you need. **For Garmin, start with the [watch installation guide](GARMIN-INSTALL.md).**
+It covers ready-made ZIPs for each supported target; no Cloudflare account, worker,
+GNOME extension or local compilation is needed for the Garmin route.
 
+```text
+sensor → xDrip4iOS → Garmin Bridge / WatchFace / DataField
+                  └→ optional Cloudflare Worker → web display / GNOME extension
 ```
-senzor ──► xDrip4iOS ──┬──► Cloudflare Worker ──┬──► telefon nebo tablet jako displej
-                       │                        └──► rozšíření do GNOME
-                       └──► Garmin hodinky (Bridge, ciferník, datové pole)
-```
 
-## Co budete potřebovat
+## Optional Cloudflare worker
 
-- **CGM senzor a iPhone s xDrip4iOS.** Mmolio si data nikde nebere samo, nechává si je
-  posílat. Odkud je bere xDrip, je jeho věc.
-- **Účet u Cloudflare** (stačí bezplatný) pro worker.
-- **Node.js** kvůli `npx wrangler`.
-- Pro hodinky navíc: **Garmin Forerunner 165**, Connect IQ SDK 9.2.0 a vlastní vývojářský
-  klíč.
-
----
-
-## 1. Cloudflare Worker
-
-Worker se tváří jako server Nightscout, přijímá měření z telefonu, drží poslední hodnotu
-a servíruje displej i jednoduché JSON API.
+The worker receives Nightscout-compatible uploads, stores the latest reading in
+KV, and serves a web display plus `/api/glucose`. This route requires your own
+Cloudflare account and Node.js. These are the project's existing deployment steps.
 
 ```bash
 git clone https://github.com/sejkoramartin/Mmolio.git
 cd Mmolio/worker
 npm install
 npx wrangler login
-```
-
-### Úložiště a tajemství
-
-```bash
-# KV pro poslední hodnotu – zapište si vrácené "id"
 npx wrangler kv namespace create TOKEN_KV
-
-# Trezor a v něm tajemství, kterým se telefon prokazuje
 npx wrangler secrets-store store create mmolio
-npx wrangler secrets-store secret create <ID-TREZORU> \
-  --name NIGHTSCOUT_API_SECRET --scopes workers --remote
-```
-
-Poslední příkaz se na hodnotu zeptá interaktivně. **Zvolte si aspoň 12 znaků**, kratší
-tajemství Nightscout neuznává. Nikam ho nepište a nikomu neposílejte.
-
-### Konfigurace a nasazení
-
-```bash
+npx wrangler secrets-store secret create <STORE_ID>   --name NIGHTSCOUT_API_SECRET --scopes workers --remote
 cp wrangler.toml wrangler.local.toml
 ```
 
-Do `wrangler.local.toml` doplňte ID svého KV a trezoru. Soubor je v `.gitignore`, takže
-vaše ID nezůstanou v repozitáři. Pak:
+Enter the secret interactively and use at least 12 characters. Put your KV and
+Secrets Store IDs in `wrangler.local.toml`, which is ignored by Git. Keep secrets
+and personal IDs out of the repository.
 
 ```bash
 npx wrangler deploy -c wrangler.local.toml
 ```
 
-Wrangler vypíše adresu, například `https://glykemie.vase-jmeno.workers.dev`. Tu si
-poznamenejte, budete ji potřebovat dál.
+Keep bindings in the configuration file; do not rely on dashboard-only settings
+being preserved by deployment. Save the worker URL printed by Wrangler.
 
-> **Bindingy musí být v konfiguračním souboru, ne naklikané v dashboardu.** `deploy`
-> odstraní z workeru všechno, co v souboru nenajde. Přesně tím tenhle projekt jednou
-> přestal fungovat a měsíc si toho nikdo nevšiml.
-
-### Nastavení v xDrip4iOS
-
-Settings → Nightscout:
-
-- **URL:** adresa vašeho workeru
-- **API_SECRET:** tajemství, které jste si zvolili
-- nahrávání zapnout
-
-Tlačítko **Test connection** musí projít; worker má kvůli němu endpoint
-`/api/v1/experiments/test`.
-
-### Kontrola
+In xDrip4iOS **Settings → Nightscout**, enter the worker URL and your API_SECRET,
+enable uploads, then use **Test connection**. The worker implements
+`/api/v1/experiments/test` for that check.
 
 ```bash
-curl -s https://glykemie.VASE-JMENO.workers.dev/api/glucose
+curl -s https://glykemie.YOUR-NAME.workers.dev/api/glucose
+# An unauthenticated write should be rejected with HTTP 401:
+curl -s -o /dev/null -w "%{http_code}\n" -X POST   https://glykemie.YOUR-NAME.workers.dev/api/v1/entries -d '[]'
 ```
 
-Vrátí poslední měření. Když vrátí **503**, ještě nic nedorazilo, což je skoro vždy věc
-nastavení v telefonu. Cizí zápis musí být odmítnut:
+HTTP 503 means no usable reading is available; check uploads and data age.
+**The read endpoint is public to anyone who knows the URL.** See the disclaimer.
+
+## Optional phone or tablet display
+
+1. Open your worker URL in the browser.
+2. On iPhone, use **Share → Add to Home Screen**, then launch it from there.
+3. For a dedicated display, configure **Settings → Display & Brightness → Auto-Lock**.
+4. Guided Access can keep the display app on screen; configure it in iOS settings.
+
+Display colour thresholds are in `colorForValue()` in `worker/public/index.html`.
+This optional display is separate from the Garmin unit setting.
+
+## Optional GNOME extension
+
+The extension shows glucose in the dock, colours it by range and age, and has
+supplemental notifications. The project's recorded desktop environment is GNOME 50
+on Wayland; this documentation update does not claim new platform validation.
+
+From the repository root:
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}\n" -X POST \
-  https://glykemie.VASE-JMENO.workers.dev/api/v1/entries -d '[]'   # čekejte 401
-```
-
----
-
-## 2. Displej na telefonu nebo tabletu
-
-Hodí se na starý telefon, který leží na stole nebo visí v dílně.
-
-1. Otevřete adresu workeru v prohlížeči.
-2. Na iPhonu: Sdílet → **Přidat na plochu**. Spuštěné z plochy to běží na celou obrazovku.
-3. Nastavení → Displej a jas → Automatický zámek → **Nikdy**.
-4. Trojklik bočního tlačítka → **Řízený přístup** zamkne aplikaci na obrazovce.
-
-Meze pro barvu hodnoty jsou ve funkci `colorForValue()` v `worker/public/index.html`.
-
----
-
-## 3. Rozšíření do GNOME
-
-Ukazuje hodnotu v docku, barví ji podle rozsahu a stáří a umí upozornit při hypo a hyper.
-Testované na GNOME 50 (Wayland).
-
-```bash
-cd Mmolio/gnome-extension/glykemie@sejkora.local
-cp config.example.json config.json      # a doplňte adresu svého workeru
-cd -
-ln -sfn "$PWD/gnome-extension/glykemie@sejkora.local" \
-  ~/.local/share/gnome-shell/extensions/glykemie@sejkora.local
+cd gnome-extension/glykemie@sejkora.local
+cp config.example.json config.json
+# Edit config.json with your own worker URL.
+cd ../..
+ln -sfn "$PWD/gnome-extension/glykemie@sejkora.local"   ~/.local/share/gnome-shell/extensions/glykemie@sejkora.local
 gnome-extensions enable glykemie@sejkora.local
 ```
 
-Pak se odhlaste a přihlaste. **Změny v `extension.js` se projeví až po odhlášení**,
-protože Wayland neumí rozšíření přenačíst za běhu. Naproti tomu `config.json` se načítá
-živě, takže pozici, velikosti, meze i upozornění doladíte bez odhlašování.
+Log out and back in after changing `extension.js` on Wayland. `config.json` is read
+at runtime. The **Alarm** switch disables the overlay and sound, including a
+currently active alarm; display colours and panel notifications remain separate.
 
-V nabídce (klik na hodnotu) je přepínač **Alarm**, který upozornění vypne včetně toho,
-které zrovna zvoní.
+## Garmin development
 
----
+For normal installation, use the [release ZIP guide](GARMIN-INSTALL.md).
+For local builds, see the [Garmin technical guide](../garmin/README.md) and
+[Fenix targets](FENIX.md). The sender is the separate
+[xDrip4iOS Garmin PR](https://github.com/JohanDegraeve/xdripswift/pull/771).
+Update both sender and receivers for automatic mmol/L / mg/dL selection.
 
-## 4. Hodinky Garmin
+## Further reading
 
-Tři aplikace pro Forerunner 165:
-
-| Aplikace | Co dělá |
-|---|---|
-| **Mmolio Bridge** | přijímá měření z telefonu, i na pozadí, a publikuje je ostatním |
-| **Mmolio WatchFace** | ciferník s glykemií, trendem, stářím, tepem a kroky |
-| **Mmolio DataField** | datové pole do sportovních aktivit |
-
-### Předpoklady
-
-- **Connect IQ SDK 9.2.0** a v SDK Manageru stažená definice zařízení **fr165**
-- **vlastní vývojářský klíč** (`.der`), který si vygenerujete v SDK Manageru nebo ve VS Code
-- Java
-
-Všechny tři aplikace **musí být podepsané stejným klíčem**. Bridge posílá hodnotu ciferníku
-přes privátní complication a tu vidí jen aplikace se stejným podpisem.
-
-### Sestavení
-
-```bash
-export CONNECTIQ_SDK="$HOME/.Garmin/ConnectIQ/Sdks/connectiq-sdk-lin-9.2.0"
-export DEVELOPER_KEY="/cesta/k/vasemu/developer_key.der"
-./garmin/scripts/build-fr165.sh
-```
-
-Vzniknou `build/fr165/release/MmolioBridge.prg`, `MmolioWatchFace.prg`
-a `MmolioDataField.prg`. Klíč do repozitáře nepatří, `.gitignore` na `*.der` myslí.
-
-### Nahrání do hodinek
-
-Připojte hodinky USB kabelem a nakopírujte `.prg` do složky `GARMIN/Apps`. Na Linuxu bývá
-zařízení přes MTP:
-
-```bash
-APPS='mtp://.../Internal Storage/GARMIN/Apps'
-gio copy build/fr165/release/MmolioBridge.prg    "$APPS/MmolioBridge.prg"
-gio copy build/fr165/release/MmolioWatchFace.prg "$APPS/MmolioWatchFace.prg"
-gio copy build/fr165/release/MmolioDataField.prg "$APPS/MmolioDataField.prg"
-sync
-```
-
-Po odpojení si hodinky aplikace nainstalují a soubory ze složky zmizí. To je normální.
-
-### Na hodinkách
-
-1. **Jednou otevřete Mmolio Bridge.** Tím se zaregistruje příjem na pozadí.
-2. Jako ciferník nastavte **Mmolio WatchFace**.
-3. Datové pole přidáte v profilu aktivity: podržet UP → Datové obrazovky → vybrat
-   obrazovku a pole → Connect IQ → **Mmolio DataField**.
-4. Jednotky, hranici stáří a meze pro barvy nastavíte v Garmin Connect u Bridge
-   a zvlášť u DataFieldu.
-
-### Odesílatel v telefonu
-
-Do hodinek posílá **upravený xDrip4iOS**, ne tenhle repozitář. Je to fork
-[`sejkoramartin/xdripswift`](https://github.com/sejkoramartin/xdripswift), větev
-`feature/garmin-watch`. Bez něj hodinky žádná data nedostanou. Formát zpráv je popsaný
-v [`garmin/wire-protocol.md`](../garmin/wire-protocol.md).
-
----
-
-## Další čtení
-
-- [FAQ](FAQ.md) – co dělat, když něco nefunguje
-- [`garmin/README.md`](../garmin/README.md) – podrobnosti k hodinkám
-- [`worker/README.md`](../worker/README.md) – provoz workeru
+- [FAQ](FAQ.md)
+- [Worker operations](../worker/README.md)
+- [Documentation index](README.md)

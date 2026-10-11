@@ -1,125 +1,142 @@
-# Časté otázky
+# Frequently asked questions
 
-## Obecné
+**English** · [Čeština](FAQ-CS.md)
 
-### Nahrazuje mi to oficiální aplikaci nebo alarmy?
-Ne, a není to tak myšlené. Mmolio jen zobrazuje hodnotu, kterou už naměřil váš senzor.
-Alarmy oficiální aplikace si nechte zapnuté. Viz [upozornění](DISCLAIMER.md).
+## General
 
-### Musím používat xDrip4iOS?
-Pro hodinky ano, protože posílá měření do Bridge. Worker přijímá cokoli, co umí nahrávat
-do Nightscoutu, takže tam si vystačíte i s jiným zdrojem.
+### Does Mmolio replace my sensor app or alarms?
 
-### Funguje to i na Androidu nebo s jinými hodinkami?
-Worker a displeje ano, ty jsou na zdroji nezávislé. Aplikace pro hodinky jsou postavené
-a ověřené pro **Forerunner 165**. Jiné modely Garminu by šly přidat do `monkey.jungle`
-a manifestu, ale rozvržení ciferníku počítá s kulatým displejem a nikdo to jinde netestoval.
+No. It displays readings already measured by your sensor. Keep your usual alarms
+enabled and read the [disclaimer](DISCLAIMER.md).
 
-### Odesílá se něco někam?
-Vaše hodnoty tečou z telefonu do vašeho workeru na vašem účtu u Cloudflare a do vašich
-hodinek. Nikam jinam. Pozor ale na to, že **adresa workeru je veřejně čitelná** – kdo ji
-zná, vidí vaši poslední hodnotu.
+### Do I need xDrip4iOS?
 
----
+The supplied Garmin receiver uses a compatible xDrip4iOS Garmin sender. The optional
+worker can accept Nightscout-compatible uploads from other sources.
 
-## Worker
+### Which watches are covered?
 
-### `/api/glucose` vrací 503
-Znamená to „zatím nedorazilo žádné měření“ a skoro vždy je to na straně telefonu:
-špatná adresa v xDripu, špatné API_SECRET nebo vypnuté nahrávání. Zkontrolujte, že
-v xDripu projde **Test connection**.
+Release candidates are built for `fr165`, `fenix7xpro` and `fenix7xpronowifi`.
+Physical validation of the current candidate is pending. Other models need their
+own build and validation; do not infer compatibility from similar names.
 
-### Test connection v xDripu neprojde
-Adresa musí být celá, i s `https://`, a bez lomítka na konci. Tajemství musí mít aspoň
-12 znaků. Worker musí být nasazený; ověřte si to tím, že se adresa otevře v prohlížeči.
+### Where do my readings go?
 
-### Po nasazení najednou nic nechodí
-Nejspíš zmizely bindingy. `wrangler deploy` odstraní z workeru všechno, co nenajde
-v konfiguračním souboru, takže KV i tajemství musí být ve `wrangler.local.toml`, ne jen
-naklikané v dashboardu.
+For Garmin, from your phone to the selected watch via Garmin's SDK. The optional
+web/desktop route uses your own Cloudflare worker. Its read endpoint is public to
+anyone who knows the URL; do not publish that URL with your glucose data.
 
-### `.get()` na tajemství spadne na „parameter 1 is not of type 'string'“
-Staré `compatibility_date`. Se starým datem runtime vyrobí z bindingu obecný Fetcher.
-Musí být aspoň `2026-05-01`.
+## Garmin
 
-### Chci měnit meze pro barvy
-Ve `worker/public/index.html` ve funkci `colorForValue()`, u rozšíření v `config.json`
-a na hodinkách v nastavení Bridge a DataFieldu.
+### Where do I download the watch applications?
 
----
+Use the model-specific ZIP under [release Assets](https://github.com/sejkoramartin/Mmolio/releases)
+and follow the [installation guide](GARMIN-INSTALL.md). GitHub's Source code archives
+are for developers, not watch installation. No Connect IQ Store listing is claimed.
 
-## Rozšíření do GNOME
+### How do I change mmol/L to mg/dL?
 
-### Změnil jsem `extension.js` a nic se nestalo
-Wayland neumí rozšíření přenačíst za běhu. Musíte se odhlásit a přihlásit. Naopak
-`config.json` se čte živě, takže se v něm dá ladit bez odhlašování.
+With Mmolio rc2 or later and the updated sender, use the existing unit preference
+in xDrip. Bridge, WatchFace and active DataField follow it automatically. Offline
+changes wait for reconnection. Older senders without unit metadata use each
+receiver's local preference; update both sides and allow a new reading to arrive.
 
-### Jak zjistím, proč rozšíření nefunguje
+### The watch shows NO DATA
+
+Open Bridge once after installation and check Garmin sharing in xDrip. DataField
+has its own application ID and needs a sender that sends directly to it. It must
+be active in an activity to receive. NO DATA is expected before the first valid reading.
+
+### Bridge has a reading, but WatchFace does not
+
+Install Bridge and WatchFace from the same release and open Bridge once. They
+must share a signing key for the private complication to be readable.
+
+### What do STALE and CHECK TIME mean?
+
+STALE means the measurement is too old (default 15 minutes). The display turns
+grey and hides the trend arrow. CHECK TIME means the measurement time is in the
+future relative to the watch. Check device clocks. Receipt time never replaces
+measurement time.
+
+### Why does raising my wrist not wake the screen?
+
+Wake behaviour is controlled by the watch firmware and gesture/sleep settings.
+Mmolio does not control the firmware's display wake policy.
+
+### Why is the AMOLED always-on ring incomplete?
+
+The low-power design uses a moving segment and shifts the content. The full ring
+appears when awake. MIP Fenix targets use a different low-power layout policy.
+
+### Can I change colours or glucose limits?
+
+Range limits are configured in Bridge for the face, and separately in DataField.
+Their local threshold settings use mmol/L. Automatic phone units control display
+formatting, not those threshold settings. Colours are implemented in
+`MmolioWatchFace/source/xDripWatchFaceView.mc` and `MmolioDataField/source/FieldRenderer.mc`.
+
+### The build cannot find a device definition
+
+Use Connect IQ SDK 9.2.0 and install the exact target's device definitions in SDK
+Manager. Device definitions are downloaded separately from the SDK archive.
+
+## Optional worker and desktop components
+
+### /api/glucose returns 503
+
+No usable reading is available. Check data age, xDrip's worker URL, API_SECRET,
+upload setting and **Test connection**.
+
+### xDrip's connection test fails
+
+Check the full `https://` URL, secret and deployed worker. The existing setup
+instructions use a secret of at least 12 characters and no trailing URL slash.
+
+### Uploads stop after deployment
+
+Check KV and secret bindings in `wrangler.local.toml`. The project's deployment
+configuration must include them rather than relying only on dashboard settings.
+
+### A secret's .get() call fails
+
+The worker's historical troubleshooting notes identify an outdated
+`compatibility_date` as a cause. Preserve the repository's configured date and
+Secrets Store binding type when reproducing that setup.
+
+### My GNOME code changes do not appear
+
+After changing `extension.js`, log out and in on Wayland. `config.json` changes
+are read at runtime. Inspect extension errors with:
+
 ```bash
-gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell \
-  --method org.gnome.Shell.Extensions.GetExtensionErrors "glykemie@sejkora.local"
+gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell   --method org.gnome.Shell.Extensions.GetExtensionErrors "glykemie@sejkora.local"
 ```
 
-### Alarm mě ruší
-V nabídce rozšíření je přepínač **Alarm**. Vypne i ten, který zrovna zvoní, a volba
-vydrží i po odhlášení. Hodnota se dál barví a upozornění v liště chodí dál.
+### How do I silence the desktop alarm?
 
----
+Use the extension's **Alarm** switch. It stops the current overlay/sound and
+persists the choice; the value display and panel notifications remain separate.
 
-## Hodinky
+## Development
 
-### Na hodinkách je `NO DATA`
-Bridge zatím nedostal žádné měření, nebo ho nedostalo datové pole. Datové pole má vlastní
-application ID a **posílá se do něj zvlášť**, takže potřebujete verzi xDripu, která to umí.
-Po instalaci je `NO DATA` správně až do prvního měření.
+### Can I check changes without watches?
 
-### Ciferník ukazuje `NO DATA`, i když Bridge hodnotu má
-Obě aplikace musí být podepsané **stejným vývojářským klíčem**, jinak ciferník privátní
-complication Bridge neuvidí. Zkontrolujte taky, že Bridge byl po instalaci aspoň jednou
-otevřený.
-
-### Co znamená `STALE`
-Hodnota je starší než nastavená hranice (výchozí 15 minut). Zešedne, zmizí u ní trendová
-šipka i barevný prstenec. Je to záměr: starý údaj se nikdy nesmí tvářit jako aktuální.
-
-### Co znamená `CHECK TIME`
-Čas měření je v budoucnosti, takže se mu nedá věřit. Obvykle je špatně nastavený čas
-v hodinkách nebo v telefonu.
-
-### Displej se nerozsvítí zvednutím ruky
-To hodinky, ne Mmolio. Aplikace rozsvícení nemůže vyvolat ani zablokovat, dělá to firmware.
-Podívejte se do Systém → Displej → Všeobecné použití a Během spánku → Gesto. V režimu
-spánku bývá gesto vypnuté.
-
-### Prstenec v Always On nesvítí celý
-Tak je to navržené. V úsporném režimu se kreslí jen běžící hlava s ocasem a každou minutu
-se posune, aby žádný pixel na okraji nesvítil dlouho. Garmin tohle u AMOLED displejů přímo
-doporučuje kvůli vypálení. Plný prstenec je vidět, když jsou hodinky probuzené.
-
-### Jde přidat vlastní barvy nebo meze?
-Meze ano, v nastavení Bridge (pro ciferník) a DataFieldu (pro pole). Barvy jsou v kódu,
-v `MmolioWatchFace/source/xDripWatchFaceView.mc` a `MmolioDataField/source/FieldRenderer.mc`.
-
-### Build skončí na chybějící definici zařízení
-V SDK Manageru musí být stažené **fr165** a SDK přesně **9.2.0**; skript na to verzi
-kontroluje. Definice zařízení nejsou součástí archivu SDK, stahují se zvlášť.
-
----
-
-## Vývoj
-
-### Jak si ověřím změny bez hodinek?
 ```bash
-.github/scripts/garmin-checks.sh          # strukturální kontroly
-./garmin/scripts/build-fr165.sh --test    # build s Monkey C testy
+.github/scripts/garmin-checks.sh
+./garmin/scripts/build-fr165.sh --test
+# With the SDK simulator running:
+"$CONNECTIQ_SDK/bin/monkeydo" build/fr165/test/MmolioBridge.prg fr165 -t
 ```
-Testy se pak pouští v simulátoru přes `monkeydo <prg> fr165 -t`. Simulátor ale neověří
-Bluetooth ani doručení z telefonu, to jde jen na skutečných hodinkách.
 
-### Proč se složky jmenují jinak než aplikace?
-Historie. Projekt se dřív jmenoval MedProbe a ciferník vznikl jako xDripWatchFace.
-Vnitřní názvy modulů v Monkey C zůstaly, aby se nemusela měnit application ID a už ověřený
-přenos do hodinek.
+See the [technical guide](../garmin/README.md) for all three applications. Simulator
+tests cannot validate real Bluetooth delivery or iPhone background behaviour.
 
-### Proč se aplikace na iPhonu jmenuje „xDrip4iO5“?
-To je název přímo od autorů xDrip4iOS, s pětkou místo velkého S. S Mmoliem to nesouvisí.
+### Why do some internal names still say MedProbe or xDripWatchFace?
+
+They are historical names. Keeping application IDs and compatible internal
+contracts avoids breaking existing senders and installations.
+
+### Why is the iPhone app named xDrip4iO5?
+
+That naming comes from the xDrip project and is separate from Mmolio.

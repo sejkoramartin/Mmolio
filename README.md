@@ -1,62 +1,85 @@
 # Mmolio
 
-**Instalace do hodinek:** [česky](docs/GARMIN-INSTALL-CS.md) · [English](docs/GARMIN-INSTALL.md).
+**English** · [Čeština](README-CS.md)
 
-Glykemie z kontinuálního senzoru tam, kam se běžně nedostane: na hodinkách Garmin, na
-starém telefonu jako displeji na stole a v liště Ubuntu.
+Display CGM glucose readings on Garmin watches, a spare phone or tablet, and the
+Ubuntu desktop. Mmolio receives readings from a phone application; it does not
+measure glucose itself.
 
-> ⚠️ **Mmolio není zdravotnický prostředek.** Jen zobrazuje hodnoty, které naměřil váš
-> senzor. Nerozhodujte podle něj o léčbě a nechte si zapnuté alarmy v oficiální aplikaci
-> senzoru. Přečtěte si [upozornění](docs/DISCLAIMER.md), je krátké.
+**Garmin installation:** [English guide](docs/GARMIN-INSTALL.md) · [Český návod](docs/GARMIN-INSTALL-CS.md)
 
+**Downloads:** [Garmin release candidates](https://github.com/sejkoramartin/Mmolio/releases).
+Choose the ZIP for your exact watch model. Each installer includes the watch apps,
+instructions, license and disclaimers, without source files, the worker or GNOME extension.
+
+> **Mmolio is not a medical device.** It is a supplemental display, not a basis for
+> treatment decisions. Keep your usual sensor application's alarms enabled.
+> Read the [disclaimer](docs/DISCLAIMER.md).
+
+## Garmin: direct phone-to-watch sharing
+
+```text
+CGM / follower → xDrip4iOS on iPhone → Connect IQ / Bluetooth → Mmolio Bridge → WatchFace
+                                                           └→ Mmolio DataField (during activities)
 ```
-Dexcom G7 ──BLE──► xDrip4iOS (iPhone) ──┬──► Connect IQ ──► Garmin FR165
-                                        │                   Bridge + ciferník + datové pole
-                                        └──► HTTPS ──► Cloudflare Worker ──┬──► telefon jako displej
-                                                                           └──► rozšíření do GNOME
+
+The phone-to-watch transfer needs no Nightscout server, Mmolio worker or watch Wi-Fi.
+Cloud-based glucose sources still need their usual internet connection. With an
+updated xDrip sender and Mmolio rc2 or later, display units automatically follow
+xDrip's existing mmol/L or mg/dL setting.
+
+Prepared receiver targets: **Forerunner 165**, **fēnix 7X Pro** and
+**fēnix 7X Pro – Solar Edition (no Wi-Fi)**. Match the exact product ID; “Solar” alone
+is not enough to select a package. The current packages are **prereleases**:
+receiver builds and simulator tests passed, but physical validation of this
+candidate remains pending for every model.
+
+The iPhone sender is maintained separately in
+[xDrip4iOS draft PR #771](https://github.com/JohanDegraeve/xdripswift/pull/771), on
+[`feature/garmin-connectiq-upstream`](https://github.com/sejkoramartin/xdripswift/tree/feature/garmin-connectiq-upstream).
+It is not yet claimed to be part of the official xDrip release. The unsigned Xcode
+build and Garmin tests passed; the full simulator suite has failures also found
+in upstream. See the PR for detailed evidence and remaining hardware tests.
+
+## Repository contents
+
+| Directory | Component |
+| --- | --- |
+| [garmin/](garmin/README.md) | Bridge receiver, WatchFace and optional activity DataField |
+| [worker/](worker/README.md) | Optional self-hosted Cloudflare receiver and web display |
+| [gnome-extension/](gnome-extension/) | Optional Ubuntu/GNOME glucose display and supplemental notifications |
+| [docs/](docs/README.md) | Installation guides, FAQ, disclaimers and development notes |
+
+The web/desktop route is separate from Garmin:
+
+```text
+xDrip4iOS → HTTPS → your Cloudflare Worker → phone/tablet web display or GNOME extension
 ```
 
-Mmolio si data nikde nebere samo, nechává si je posílat. Neptá se žádné cizí služby,
-nepotřebuje vaše heslo k senzoru a nikam nic neodesílá.
+Use only the components you need. The worker is configured with your own account
+and upload secret; Mmolio does not need your sensor-service password. The optional
+worker's read endpoint is public to anyone who knows its URL; see the disclaimer.
 
-## Co je uvnitř
+## Installation and development
 
-| Složka | Co to je |
-|---|---|
-| [`garmin/`](garmin/README.md) | Tři aplikace pro Forerunner 165 a fēnix 7X Pro (včetně varianty bez Wi-Fi): **Mmolio Bridge** přijímá měření z telefonu i na pozadí, **Mmolio WatchFace** je ciferník, **Mmolio DataField** datové pole do aktivit |
-| [`worker/`](worker/README.md) | Cloudflare Worker, který se tváří jako Nightscout, přijímá měření a servíruje displej i `/api/glucose` |
-| `gnome-extension/` | Rozšíření GNOME: hodnota v docku, barvy podle rozsahu a stáří, volitelné upozornění |
-| [`docs/`](docs/INSTALL.md) | Instalace, FAQ, právní upozornění |
+- [Install Garmin apps from a release ZIP](docs/GARMIN-INSTALL.md)
+- [Set up optional web and desktop components](docs/INSTALL.md)
+- [Troubleshooting / FAQ](docs/FAQ.md)
+- [Garmin build instructions](garmin/README.md) and [phone protocol](garmin/wire-protocol.md)
 
-Odesílatel do hodinek tady není. Je to fork xDrip4iOS
-[`sejkoramartin/xdripswift`](https://github.com/sejkoramartin/xdripswift), větev
-`feature/garmin-watch`, protože xDrip je samostatný projekt pod GPL a musí se
-synchronizovat s upstreamem. Formát zpráv mezi telefonem a hodinkami je zapsaný
-v [`garmin/wire-protocol.md`](garmin/wire-protocol.md).
+Source code remains available under GPL-3.0. Garmin installation ZIPs do not require
+users to compile; developers can reproduce builds from the exact source revision
+recorded in each package's `RELEASE.json`.
 
-## Instalace
+## Measurement age
 
-Postup krok za krokem je v [`docs/INSTALL.md`](docs/INSTALL.md): Cloudflare Worker,
-displej na telefonu, rozšíření do GNOME a hodinky Garmin. Části jsou nezávislé, postavte
-si jen to, co chcete. Když něco nefunguje, koukněte do [FAQ](docs/FAQ.md).
+**An old reading must never appear current.** Age is measured from the original
+measurement time, not the time it arrived. The watch marks old readings `STALE`
+and hides the trend arrow. Missing, old or future-dated data must not be interpreted
+as a current valid measurement.
 
-Zveřejňuje se zdrojový kód, ne hotové balíčky. Každý si Mmolio sestaví a provozuje sám
-pro sebe, na svém účtu a se svým vývojářským klíčem.
+## License
 
-## Pravidlo, které platí všude
-
-**Stará hodnota se nikdy netváří jako aktuální.** Stáří se počítá od okamžiku měření,
-nikdy od chvíle, kdy hodnota dorazila. Hodinky starou hodnotu zešediví, označí `STALE`
-a schovají trendovou šipku. Worker raději vrátí chybu, než aby mlčky poslal zastaralý
-údaj.
-
-Vzniklo to z konkrétní zkušenosti: worker tu jednou měsíc nefungoval a nikdo si toho
-nevšiml, protože displej dál ukazoval poslední známé číslo.
-
-## Licence
-
-[GNU GPL v3](LICENSE). Software je poskytován bez jakékoli záruky.
-
-Dexcom, FreeStyle Libre, Garmin, Connect IQ a Cloudflare jsou ochranné známky svých
-vlastníků a používají se tu jen popisně. Mmolio není žádnou z těchto firem vyvíjené,
-podporované ani schválené.
+[GNU GPL v3](LICENSE), without warranty. Dexcom, FreeStyle Libre, Garmin, Connect IQ,
+Cloudflare and other product names belong to their respective owners. Mmolio is
+not developed, endorsed or approved by those companies.

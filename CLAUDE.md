@@ -30,7 +30,7 @@ Pro worker a GNOME rozšíření platí navíc `worker/CLAUDE.md`, pro hodinky `
    `config.example.json`.
 5. **Změny se ověřují lokálně, ne v CI.** GitHub Actions se šetří.
 6. **Repo je veřejné pod GPL-3.0.** Do repa nepatří adresa workeru, ID účtu ani nic
-   osobního – všude jen příklady. Veřejná dokumentace je česky v `docs/`.
+   osobního – všude jen příklady. Veřejná dokumentace je primárně anglicky; české verze mají příponu `-CS.md` a obousměrné odkazy. Historické podklady a komunikace mohou zůstat česky.
 7. **Komunikace je česky.**
 
 ## Jak se dělají změny

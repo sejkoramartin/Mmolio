@@ -14,7 +14,7 @@ Integrace do oficiálního xDrip4iOS se teprve připravuje; návod neslibuje jej
 přítomnost v současném oficiálním vydání.
 
 Mmolio je doplňkový displej a v hodinkách nemá alarmy glykémie. Přečtěte si
-[upozornění](DISCLAIMER.md) a ponechte své obvyklé aplikace a alarmy.
+[upozornění](DISCLAIMER-CS.md) a ponechte své obvyklé aplikace a alarmy.
 
 ## 1. Vyberte přesný model
 
@@ -84,7 +84,7 @@ se odešle po jeho obnovení; datové pole musí běžet v aktivitě. Po aktuali
 počkejte na nové měření. Starší telefon bez informace o jednotkách používá místní
 nastavení každého přijímače; starší aplikace v hodinkách je nutné aktualizovat.
 
-Výchozí limit stáří je 15 minut. Nastavení hodinek popisuje [technický návod](../garmin/README.md).
+Výchozí limit stáří je 15 minut. Nastavení hodinek popisuje [technický návod](../garmin/README-CS.md).
 Dosah Bluetooth, uspání iOS, ruční ukončení aplikace nebo omezení hodinek mohou
 přenos zpozdit nebo zastavit. Nepřetržitý běh na pozadí není garantovaný.
 

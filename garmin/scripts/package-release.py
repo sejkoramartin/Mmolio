@@ -10,7 +10,7 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[2]
 APPS = ("MmolioBridge", "MmolioWatchFace", "MmolioDataField")
-DOCS = ("GARMIN-INSTALL.md", "GARMIN-INSTALL-CS.md", "DISCLAIMER.md", "DISCLAIMER-EN.md", "FENIX.md")
+DOCS = ("GARMIN-INSTALL.md", "GARMIN-INSTALL-CS.md", "DISCLAIMER.md", "DISCLAIMER-EN.md", "DISCLAIMER-CS.md", "FENIX.md", "FENIX-CS.md")
 REPOSITORY = "https://github.com/sejkoramartin/Mmolio"
 
 
@@ -52,6 +52,7 @@ def main():
             data = (ROOT / "docs" / doc).read_text()
             # Keep the essential guide offline; supplemental technical material stays online.
             data = data.replace("../garmin/README.md", REPOSITORY + "/blob/" + revision + "/garmin/README.md")
+            data = data.replace("../garmin/README-CS.md", REPOSITORY + "/blob/" + revision + "/garmin/README-CS.md")
             contents["docs/" + doc] = data.encode()
         contents["INSTALL-EN.txt"] = contents["docs/GARMIN-INSTALL.md"]
         contents["NAVOD-CS.txt"] = contents["docs/GARMIN-INSTALL-CS.md"]
@@ -75,14 +76,14 @@ def main():
         contents["RELEASE.json"] = (json.dumps(manifest, ensure_ascii=False, indent=2) + "\n").encode()
         contents["START-HERE.txt"] = (
             f"Mmolio {config['version']} — {name} ({device})\n\n"
-            "LOKÁLNÍ TESTOVACÍ KANDIDÁT / LOCAL RELEASE CANDIDATE\n"
-            "Fyzické ověření tohoto kandidáta čeká. / Physical validation is pending.\n\n"
-            "Česky: otevřete NAVOD-CS.txt. English: open INSTALL-EN.txt.\n"
-            "Pouze pro model uvedený výše. / Only for the exact model above.\n"
-            "Instalační soubory jsou v apps/. / Installation files are in apps/.\n"
-            "Nejdřív přečtěte disclaimer v docs/. / Read the disclaimer in docs/ first.\n"
-            "Licence: LICENSE. Verze a přesný zdroj: RELEASE.json.\n"
+            "LOCAL RELEASE CANDIDATE / TESTOVACÍ KANDIDÁT\n"
+            "Physical validation is pending. / Fyzické ověření tohoto kandidáta čeká.\n\n"
+            "English: open INSTALL-EN.txt. Čeština: otevřete NAVOD-CS.txt.\n"
+            "Only for the exact model above. / Pouze pro model uvedený výše.\n"
+            "Installation files are in apps/. / Instalační soubory jsou v apps/.\n"
+            "Read the disclaimer in docs/ first. / Nejdřív přečtěte upozornění v docs/.\n"
             "License: LICENSE. Version and corresponding source: RELEASE.json.\n"
+            "Licence: LICENSE. Verze a přesný zdroj: RELEASE.json.\n"
         ).encode()
         contents["SHA256SUMS"] = "".join(f"{sha(data)}  {path}\n" for path, data in sorted(contents.items())).encode()
         filename = f"Mmolio-{config['version']}-{device}.zip"

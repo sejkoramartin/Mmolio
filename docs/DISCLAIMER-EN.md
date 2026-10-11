@@ -1,4 +1,6 @@
-# Mmolio disclaimer
+# Mmolio watch disclaimer
+
+**English** · [Čeština](DISCLAIMER-CS.md)
 
 Mmolio is not a medical device. It is a supplemental display of readings obtained
 by your sensor and phone application. It does not measure glucose or make treatment
@@ -18,4 +20,4 @@ descriptively. Mmolio is not developed, endorsed or approved by those companies.
 This watch installation does not require the optional Mmolio Cloudflare worker.
 The Garmin sender transmits readings to the selected watch through Garmin's SDK.
 The optional web/desktop components have separate data and network considerations;
-see the project's original [disclaimer](DISCLAIMER.md).
+see the project's [full disclaimer](DISCLAIMER.md).

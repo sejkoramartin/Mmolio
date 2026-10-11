@@ -1,57 +1,58 @@
-# Upozornění
+# Mmolio disclaimer
 
-**Mmolio není zdravotnický prostředek.**
+**English** · [Čeština](DISCLAIMER-CS.md)
 
-Mmolio je doplňkový displej. Jen zobrazuje hodnoty, které naměřil váš senzor a které mu
-pošle aplikace na telefonu. Nic neměří, nic nevyhodnocuje a k ničemu se nevyjadřuje.
+**Mmolio is not a medical device.** It is a supplemental display of readings
+measured by your sensor and sent by your phone application. It does not measure
+glucose or make treatment recommendations.
 
-## O léčbě podle Mmolia nerozhodujte
+## Treatment decisions
 
-Dávkování inzulinu, jídlo a posouzení vašeho stavu vždy řešte podle **oficiální aplikace
-svého senzoru a podle glukometru**, nikdy podle Mmolia.
+Do not base insulin dosing, food decisions or assessment of your condition on
+Mmolio. Use your usual official sensor application and glucose meter.
 
-## Alarmy si nechte v oficiální aplikaci
+## Keep your usual alarms enabled
 
-Alarmy oficiální aplikace senzoru jsou vaše hlavní pojistka a mají zůstat zapnuté.
-Upozornění v Mmoliu jsou pouze doplňková. Mohou se opozdit nebo nezaznít vůbec, například
-když vypadne internet, vybije se telefon, počítač usne nebo hodinky ztratí spojení.
+Keep the official sensor application's alarms enabled. Mmolio notifications are
+supplemental and may be delayed or missing if connectivity is lost, a device runs
+out of power or a computer sleeps. The Garmin watch app, watch face and data field
+do not provide glucose alarms. Only the optional GNOME extension provides
+supplemental notifications, which can be disabled.
 
-Watch-app, ciferník ani datové pole na hodinkách žádné alarmy nemají a mít nebudou.
-Upozornění umí jen rozšíření do GNOME a jde vypnout.
+## Readings can be old, incorrect or missing
 
-## Hodnota může být stará, chybná, nebo nemusí dorazit
+Data passes through multiple devices and, for the optional web/desktop route,
+the internet. It may be delayed or lost. Measurement age must be calculated from
+the original measurement time, not receipt time. The watch marks old readings
+`STALE` and future measurement times `CHECK TIME`. A missing or grey display means
+that a current reading is unavailable, not that everything is normal.
 
-Data putují přes několik zařízení a přes internet. Cestou se mohou zdržet nebo ztratit.
+## No warranty
 
-Proto v Mmoliu platí pravidlo, které nikdy neporušujeme: **stará hodnota se nikdy netváří
-jako aktuální.** Všude se počítá stáří od okamžiku měření, hodinky starou hodnotu zešediví
-a označí `STALE`, a worker raději vrátí chybu, než aby mlčky poslal zastaralý údaj.
-Prázdné nebo šedé místo znamená „nevím“, ne „je to v pořádku“.
+Mmolio is free software provided without warranty, including merchantability or
+fitness for a particular purpose. Use is at your own risk. The author disclaims
+liability for damages arising from use, subject to the terms of the
+[GPL-3.0 license](../LICENSE).
 
-## Bez záruky
+## Distribution
 
-Mmolio je otevřený software poskytovaný zdarma a **bez jakékoli záruky**, včetně záruky
-prodejnosti a vhodnosti pro určitý účel. Používáte jej na vlastní riziko. Autor
-neodpovídá za škody vzniklé jeho použitím. Podrobnosti jsou v [licenci](../LICENSE).
+Source is public under GPL-3.0. Versioned Garmin prerelease installers include
+instructions, license, corresponding-source information and validation status.
+Other components are built and operated by their users. A successful build or
+simulator test does not establish physical-device reliability.
 
-## Co se zveřejňuje
+## Trademarks
 
-Zdrojový kód zůstává veřejný pod GPL-3.0. Pro Garmin připravujeme také verzované
-instalační balíčky s návodem, licencí a uvedeným stavem ověření; jejich zveřejnění
-proběhne samostatně. Ostatní části projektu si uživatel sestavuje a provozuje sám.
+Dexcom, FreeStyle Libre, Garmin, Connect IQ, Cloudflare and other product names
+belong to their owners and are used descriptively. Mmolio is not developed,
+endorsed or approved by those companies.
 
-## Ochranné známky
+## Your data
 
-Dexcom, FreeStyle Libre, Garmin, Connect IQ, Cloudflare a další názvy patří svým
-vlastníkům. V Mmoliu se používají **jen popisně**, aby bylo zřejmé, s čím projekt
-spolupracuje. Mmolio není žádnou z těchto firem vyvíjené, podporované ani schválené.
+The Garmin route sends readings from the phone to the selected watch through
+Garmin's SDK and does not require a Mmolio server. The optional web/desktop route
+sends readings to your own worker on your Cloudflare account.
 
-## Vaše data
-
-Mmolio neposílá vaše hodnoty nikomu dalšímu. Tečou z vašeho telefonu do vašeho vlastního
-workeru na vašem účtu u Cloudflare a do vašich hodinek. Nikdo jiný k nim nemá přístup,
-pokud mu adresu vašeho workeru nedáte.
-
-**Adresa workeru je veřejně čitelná.** Kdo ji zná, může si přečíst vaši poslední hodnotu.
-Zacházejte s ní jako s citlivým údajem: nedávejte ji do screenshotů, do issue na GitHubu
-ani nikam, kde ji uvidí cizí lidé.
+**The optional worker's read endpoint is public.** Anyone who knows its address
+can read the latest value. Do not treat an unshared URL as access control. Keep
+that address out of screenshots, public issues and other public material.

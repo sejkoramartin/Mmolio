@@ -1,36 +1,34 @@
-# Mmolio pro fēnix 7X Pro
+# Mmolio for fēnix 7X Pro
 
-Podporované cíle pro sestavení jsou `fenix7xpro` a `fenix7xpronowifi`.
-V SDK Manageru se druhý jmenuje **fēnix 7X Pro – Solar Edition (no Wi-Fi)**.
-Běžný Solar / Sapphire Solar model patří pod **fēnix 7X Pro**.
-Samotné slovo Solar tedy nestačí k určení cíle.
+**English** · [Čeština](FENIX-CS.md)
 
-Oba mají MIP displej 280 × 280. Ciferník ukazuje čas, datum, baterii, glykemii,
-trend, stáří měření, tep a kroky. Na MIP zůstává plný prstenec a stejné rozložení
-v úsporném režimu; neběží animace ani AMOLED posun a ztlumení. U zastaralého
-měření nebo budoucího času je hodnota šedá, trend a prstenec se skryjí a zobrazí
-se stav. FR165 zachovává své AMOLED chování.
+Prepared build targets are `fenix7xpro` and `fenix7xpronowifi`. The latter appears
+in SDK Manager as **fēnix 7X Pro – Solar Edition (no Wi-Fi)**. Match the exact device
+product information; “Solar” alone is insufficient and not using Wi-Fi does not
+make the no-Wi-Fi build appropriate.
 
-## Telefon a výběr hodinek
+Both targets use a 280 × 280 MIP display. The face shows time, date, battery,
+glucose, trend, age, heart rate and steps. Low-power MIP mode keeps the full ring
+and layout without AMOLED animation, movement or dimming. Stale/future readings
+turn grey and hide trend/ring. FR165 retains its separate AMOLED behaviour.
 
-Je potřeba upravený xDrip4iOS z větve `feature/garmin-watch` a Garmin Connect
-na iPhonu. Hodinky nejprve spárujte v Garmin Connect. Potom v nastavení Garmin
-v xDripu otevřete výběr zařízení a zvolte své hodinky.
+## Phone and watch selection
 
-Výběr již používá `ConnectIQ.showDeviceSelection()` a přijímá vrácená zařízení
-bez filtru modelů. Nové modely proto nevyžadují nový seznam ani nový build
-xDripu. Identifikátory Bridge a DataField i formát zpráv zůstávají stejné.
-Ověřeno ve zdroji `ConnectIQTransport.swift` a nastavení Garmin ve větvi
-`feature/garmin-watch` dne 3. 10. 2026.
-Přenos z telefonu používá Bluetooth; Wi-Fi v hodinkách není podmínkou.
-Samotné zobrazení hodinek v nabídce nepotvrzuje doručování dat do aplikace.
+Use a compatible xDrip4iOS Garmin sender and Garmin Connect on the iPhone.
+Pair through Garmin Connect, then authorize/select the watch in xDrip's Garmin
+settings. The [upstream PR](https://github.com/JohanDegraeve/xdripswift/pull/771)
+contains the reviewed sender; `feature/garmin-watch` is the older personal branch.
 
-## Sestavení
+The sender uses Connect IQ device selection without a watch-model allow-list.
+The receiver IDs and wire format are the same across targets. A watch appearing
+in the selector is not proof that a reading reached the receiver. Phone-to-watch
+transfer uses Bluetooth; watch Wi-Fi is not required.
 
-SDK zůstává 9.2.0. V SDK Manageru nainstalujte definice FR165 a obou variant
-Fēnixu (jungle soubory obsahují jejich kvalifikátory).
-Nastavte `CONNECTIQ_SDK` a `DEVELOPER_KEY` stejně jako v Garmin README.
-Všechny aplikace musí být podepsané stejným stávajícím klíčem.
+## Build
+
+Use SDK 9.2.0 and install device definitions for FR165 and both Fenix targets.
+Set `CONNECTIQ_SDK` and `DEVELOPER_KEY` as in the [technical guide](../garmin/README.md).
+Sign matching components with the same existing key.
 
 ```bash
 ./garmin/scripts/build-device.sh fenix7xpro
@@ -38,38 +36,30 @@ Všechny aplikace musí být podepsané stejným stávajícím klíčem.
 ./garmin/scripts/build-device.sh fenix7xpro --test
 ```
 
-Výsledky jsou v `build/<zařízení>/release/` nebo `build/<zařízení>/test/`.
-Původní `build-fr165.sh [--test]` zůstává funkční.
+Outputs are under `build/<device>/release/` or `build/<device>/test/`.
+`build-fr165.sh [--test]` remains available for FR165.
 
-## Instalace a ověření na skutečných hodinkách
+## Installation and physical verification
 
-1. Podle přesného modelu vyberte odpovídající složku. Pokud model není jistý,
-   ověřte produktové číslo nebo informace o zařízení; nenahrávejte obě varianty.
-2. Přes USB nahrajte release soubory `MmolioBridge.prg` a `MmolioWatchFace.prg`
-   do `GARMIN/APPS`. Volitelně také `MmolioDataField.prg` pro sportovní aktivity.
-   Existující instalace nejprve zálohujte; zachovejte jejich názvy a nemažte jiná data.
-3. Jednou otevřete Bridge a nastavte Mmolio WatchFace jako ciferník.
-4. V xDripu zapněte Garmin a vyberte hodinky. Ověřte několik nových měření,
-   také se zamčeným iPhonem a zavřenou aplikací Bridge.
-5. Ověřte přechod do úsporného režimu, glykemii, trend, stáří a barvy podle
-   nastavení rozsahu v Bridge. Krátce přerušte přenos a zkontrolujte stav STALE
-   po překročení nastaveného limitu; po obnovení musí přijít nové měření.
-6. Datové pole přidejte do aktivity a ověřte doručování i tam.
+1. Choose the exact target. Check product/device information if uncertain; do not install both variants.
+2. Follow the [USB installation guide](GARMIN-INSTALL.md), preserving existing app filenames and unrelated data.
+3. Open Bridge once, choose Mmolio WatchFace and enable/select Garmin sharing in xDrip.
+4. Compare several fresh readings, including with the iPhone locked and Bridge closed.
+5. Check units, trend, age, range colours and low-power mode. Interrupt delivery and verify STALE after the configured threshold, then recovery with a new measurement.
+6. Add DataField to an activity and verify its separate reception.
 
-Testy simulátoru nenahrazují ověření Bluetooth a běhu na pozadí na konkrétním
-telefonu a hodinkách. Platí [upozornění projektu](DISCLAIMER.md).
+These checks remain pending for the current candidate on physical Fenix devices.
+Read the [disclaimer](DISCLAIMER.md).
 
-## Lokální ověření 3. 10. 2026
+## Historical local evidence — October 3, 2026
 
-- SDK 9.2.0: všech 18 buildů (3 aplikace × 3 zařízení × release/test) úspěšných.
-- Simulátor: na každém zařízení Bridge 10/10, WatchFace 7/7, DataField 14/14;
-  celkem 93 úspěšných testů. Každá aplikace spuštěna v čisté instanci simulátoru.
-- Vizuálně ověřeno 10 scénářů ciferníku na každém modelu: čerstvá a vysoká hodnota,
-  oba stavy v úsporném režimu, STALE, NO DATA, CHECK TIME, 1000 mg/dL,
-  neznámý trend a STALE 12d v úsporném režimu. Bez překrytí a ořezu.
-- Obě varianty Fēnixu vykreslily shodné obrazovky. Čerstvé měření na MIP je
-  pixelově shodné v běžném a úsporném zobrazení.
-- FR165 Bridge a DataField jsou bajtově shodné s kontrolním sestavením před změnou
-  provedeným se stejnými aktualizovanými definicemi zařízení a SDK.
-- Strukturální kontroly a kontrola syntaxe build skriptů prošly.
-- Přenos z iPhonu a běh na fyzickém Fēnixu zůstává nutné ověřit.
+- SDK 9.2.0: all 18 release/test builds passed (3 apps × 3 devices × 2 modes).
+- Simulator: Bridge 10/10, WatchFace 7/7, DataField 14/14 per device; 93 tests total.
+- Ten watch-face scenarios per model were visually checked: fresh/high, normal/low-power,
+  STALE, NO DATA, CHECK TIME, 1000 mg/dL, unknown trend and STALE 12d in low power.
+- Both Fenix variants rendered matching screens; fresh MIP normal/low-power views matched pixel-for-pixel.
+- FR165 Bridge and DataField matched the control build byte-for-byte using the same SDK/device definitions.
+- Structural and build-script syntax checks passed. Physical Fenix/iPhone delivery was not tested.
+
+The later **rc2** candidate passed 99 simulator tests and nine release builds.
+Historical visual checks are not a claim that the latest candidate was tested on hardware.
