@@ -28,12 +28,14 @@ module MedProbe {
         static const KEY_MEASURED_AT = "m";
         static const KEY_SOURCE = "s";
         static const KEY_SEQUENCE = "q";
+        static const KEY_DISPLAY_UNIT = "u"; // optional: 0 mg/dL, 1 mmol/L
 
         var mgdl;
         var trend;
         var measuredAt;   // Unix seconds
         var source;
         var sequence;
+        var displayUnit = null;
 
         function initialize(glucoseMgdl, trendValue, measuredAtSeconds, sourceValue, sequenceValue) {
             mgdl = glucoseMgdl;
@@ -65,7 +67,16 @@ module MedProbe {
                 return null;
             }
 
-            return new GlucoseReading(mgdl, trend, measuredAt, source, sequence);
+            var unit = payload.get(KEY_DISPLAY_UNIT);
+            if (!validDisplayUnit(unit)) { return null; }
+            var reading = new GlucoseReading(mgdl, trend, measuredAt, source, sequence);
+            reading.displayUnit = unit;
+            return reading;
+        }
+
+        static function validDisplayUnit(unit) {
+            return unit == null || ((unit instanceof Lang.Number || unit instanceof Lang.Long)
+                && (unit == 0 || unit == 1));
         }
 
         // How old this reading is, in seconds.
@@ -101,7 +112,8 @@ module MedProbe {
                 KEY_TREND => trend,
                 KEY_MEASURED_AT => measuredAt,
                 KEY_SOURCE => source,
-                KEY_SEQUENCE => sequence
+                KEY_SEQUENCE => sequence,
+                KEY_DISPLAY_UNIT => displayUnit
             };
         }
 
@@ -119,7 +131,11 @@ module MedProbe {
                 || source == null || sequence == null) {
                 return null;
             }
-            return new GlucoseReading(mgdl, trend, measuredAt, source, sequence);
+            var unit = stored.get(KEY_DISPLAY_UNIT);
+            if (!validDisplayUnit(unit)) { return null; }
+            var reading = new GlucoseReading(mgdl, trend, measuredAt, source, sequence);
+            reading.displayUnit = unit;
+            return reading;
         }
     }
 }

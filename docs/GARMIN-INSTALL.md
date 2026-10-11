@@ -80,6 +80,15 @@ its data compatibility. Follow the phone build's own installation instructions.
 | Bridge updates but face does not | Install matching Bridge/WatchFace files from one release and reopen Bridge. |
 | DataField does not update | Check that it is active and the xDrip build supports direct DataField sending; wait for a new reading. |
 
+With receiver **2026.10.11-rc2 or later** and an updated xDrip Garmin build,
+Bridge, WatchFace and DataField automatically use xDrip's existing glucose unit
+setting: mmol/L (one decimal) or mg/dL (whole numbers). No extra switch is needed.
+Changing units in xDrip sends the latest real reading again without changing its
+measurement time. If disconnected, it is sent when ready again; DataField must be
+active to receive. After upgrading, allow a new reading to arrive. Older phone
+builds without unit metadata use each receiver's local unit preference instead;
+older watch builds must be updated to follow the phone.
+
 The reviewed default stale threshold is 15 minutes. Watch settings and units are
 explained in the [Garmin technical guide](../garmin/README.md). Internet loss,
 Bluetooth range, iOS suspension, force quit and watch restrictions can delay or

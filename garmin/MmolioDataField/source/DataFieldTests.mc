@@ -134,3 +134,34 @@ function fieldSettingsAreItsOwnAndValidated(logger as Test.Logger) as Lang.Boole
     Test.assert(MmolioField.FieldReceiver.usesMmol());
     return true;
 }
+
+(:test)
+function fieldFollowsPhoneUnitsAndLegacyFallback(logger as Test.Logger) as Lang.Boolean {
+    Storage.deleteValue(MedProbe.GlucoseStore.STORAGE_KEY);
+    var oldSetting = Application.Properties.getValue("useMmol");
+    Application.Properties.setValue("useMmol", false);
+    var packet = FieldTestSupport.packet(180, 4, 1700000000, 3, 100);
+    packet["u"] = 1;
+    Test.assert(MmolioField.FieldReceiver.receive(packet));
+    Test.assert(MmolioField.FieldReceiver.usesMmol());
+    var sample = MmolioField.FieldReceiver.toSample(FieldTestSupport.stored(), MmolioField.FieldReceiver.usesMmol(), 900);
+    Test.assertEqual("10.0", sample.valueText());
+    Test.assertEqual("mmol/L", sample.unitText());
+    packet["u"] = 0; packet["q"] = 101;
+    Test.assert(MmolioField.FieldReceiver.receive(packet));
+    sample = MmolioField.FieldReceiver.toSample(FieldTestSupport.stored(), MmolioField.FieldReceiver.usesMmol(), 900);
+    Test.assertEqual("180", sample.valueText());
+    Test.assertEqual("mg/dL", sample.unitText());
+    Test.assert(sample.isStale(1700000900));
+    packet["u"] = 1; packet["q"] = 100;
+    Test.assert(!MmolioField.FieldReceiver.receive(packet));
+    Test.assert(!MmolioField.FieldReceiver.usesMmol());
+    packet["q"] = 102; packet["u"] = 2;
+    Test.assert(!MmolioField.FieldReceiver.receive(packet));
+    Application.Properties.setValue("useMmol", true);
+    Test.assert(MmolioField.FieldReceiver.receive(FieldTestSupport.packet(180, 4, 1700000000, 3, 103)));
+    Test.assert(MmolioField.FieldReceiver.usesMmol());
+    Storage.deleteValue(MedProbe.GlucoseStore.STORAGE_KEY);
+    Application.Properties.setValue("useMmol", oldSetting);
+    return true;
+}

@@ -53,3 +53,33 @@ function receiverFutureTimestampIsStale(logger) {
     Test.assertEqual("CHECK TIME", MedProbe.Formatter.age(future));
     return true;
 }
+
+(:test)
+function phoneUnitsPersistAndDriveBridgeAndFace(logger) {
+    Toybox.Application.Storage.deleteValue(MedProbe.GlucoseStore.STORAGE_KEY);
+    var packet = {"v" => 1, "g" => 180, "t" => 4, "m" => 1700000000, "s" => 3, "q" => 100, "u" => 0};
+    var first = MedProbe.GlucoseReading.fromMessage(packet);
+    Test.assert(MedProbe.GlucoseStore.accept(first));
+    Test.assert(!MedProbe.Formatter.usesMmol());
+    Test.assertEqual("180", MedProbe.Formatter.value(first));
+    Test.assertEqual("mg/dL", MedProbe.Formatter.unitLabel());
+    packet["q"] = 101; packet["u"] = 1;
+    Test.assert(MedProbe.GlucoseStore.accept(MedProbe.GlucoseReading.fromMessage(packet)));
+    var restored = MedProbe.GlucoseStore.load();
+    Test.assertEqual(1, restored.displayUnit);
+    Test.assertEqual(1700000000, restored.measuredAt);
+    Test.assertEqual("10.0", MedProbe.Formatter.value(restored));
+    var sample = Mmolio.SampleCodec.decode(MedProbe.GlucoseComplication.encodeSample(
+        restored, MedProbe.GlucoseComplication.usesMmol(), 900));
+    Test.assertEqual("mmol/L", sample.unitText());
+    Test.assertEqual("10.0", sample.valueText());
+    Test.assert(sample.isStale(1700000900));
+    Test.assert(!MedProbe.GlucoseStore.accept(first));
+    Test.assert(MedProbe.Formatter.usesMmol());
+    packet["u"] = 7;
+    Test.assert(MedProbe.GlucoseReading.fromMessage(packet) == null);
+    packet["u"] = "0";
+    Test.assert(MedProbe.GlucoseReading.fromMessage(packet) == null);
+    Toybox.Application.Storage.deleteValue(MedProbe.GlucoseStore.STORAGE_KEY);
+    return true;
+}

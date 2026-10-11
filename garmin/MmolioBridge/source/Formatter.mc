@@ -31,8 +31,7 @@ module MedProbe {
         // Whether the user wants mmol/L. Defaults to mmol/L, which is what both
         // supported regions for this project use.
         static function usesMmol() {
-            var setting = Application.Properties.getValue("useMmol");
-            return setting == null ? true : setting;
+            return GlucoseStore.usesMmol();
         }
 
         static function unitLabel() {

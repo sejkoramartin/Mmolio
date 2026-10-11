@@ -76,6 +76,14 @@ Pro instalaci do telefonu platí návod k danému vydání xDripu.
 | Bridge funguje, ciferník ne | Nahrajte odpovídající Bridge i ciferník z jednoho vydání a znovu otevřete Bridge. |
 | Pole se neaktualizuje | Musí běžet v aktivitě a xDrip musí podporovat přímé odesílání do pole. Počkejte na nové měření. |
 
+Od přijímače **2026.10.11-rc2** s aktualizovaným Garmin rozšířením xDripu přebírají
+Bridge, ciferník i datové pole jednotky automaticky z běžného nastavení xDripu:
+mmol/L s jedním desetinným místem nebo celé mg/dL. Další přepínač není potřeba.
+Změna jednotek znovu odešle poslední skutečné měření s původním časem. Bez spojení
+se odešle po jeho obnovení; datové pole musí běžet v aktivitě. Po aktualizaci
+počkejte na nové měření. Starší telefon bez informace o jednotkách používá místní
+nastavení každého přijímače; starší aplikace v hodinkách je nutné aktualizovat.
+
 Výchozí limit stáří je 15 minut. Nastavení hodinek popisuje [technický návod](../garmin/README.md).
 Dosah Bluetooth, uspání iOS, ruční ukončení aplikace nebo omezení hodinek mohou
 přenos zpozdit nebo zastavit. Nepřetržitý běh na pozadí není garantovaný.

@@ -55,10 +55,9 @@ module MmolioField {
             return Math.round(mmol * 18.0182).toNumber();
         }
 
-        // Settings are the field's own, independent of Mmolio Bridge.
+        // Follow the accepted phone packet; legacy senders use the local setting.
         static function usesMmol() as Lang.Boolean {
-            var setting = Application.Properties.getValue("useMmol");
-            return setting instanceof Lang.Boolean ? setting : true;
+            return MedProbe.GlucoseStore.usesMmol();
         }
 
         private static function isInteger(value) as Lang.Boolean {

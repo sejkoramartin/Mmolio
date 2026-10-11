@@ -1,6 +1,6 @@
 # Garmin release preparation
 
-This is the release checklist for `2026.10.11-rc1`.
+This is the release checklist for `2026.10.11-rc2`.
 
 On 2026-10-11 the owner authorized publishing the prepared release candidate and
 opening a draft upstream PR before Apple-platform and physical testing is complete.
@@ -27,13 +27,13 @@ Build logs are for local review and should not be uploaded as release assets.
 The installation archives omit source; publish their exact corresponding source
 commit so the source links in RELEASE.json work.
 
-## Required before publication
+## Validation before stable publication (prerelease exception above)
 
 - [ ] Full clean-upstream xDrip build with the real SDK on macOS/Xcode.
 - [ ] End-to-end installation using the exact ZIP, on a test iPhone and each watch
       model that will be advertised as physically validated. Document exact versions.
 - [ ] Test Bridge/face/field, locked phone, Bluetooth reconnect, switching watches,
-      disable, calibration correction and stale/future measurements.
+      disable, calibration correction, automatic unit changes and stale/future measurements.
 - [ ] Check upgrade from the older Mmolio filenames and matching signing key.
 - [ ] Review the test matrix in the xDrip branch; do not downgrade a personal v33 DB.
 - [ ] Review English/Czech user instructions on a fresh installation.

@@ -41,6 +41,17 @@ module MedProbe {
             return true;
         }
 
+        // Phone preference belongs to the accepted reading: older/rejected packets
+        // cannot change units. Legacy senders retain the local app preference.
+        static function usesMmol() {
+            var reading = load();
+            if (reading != null && reading.displayUnit != null) {
+                return reading.displayUnit == 1;
+            }
+            var setting = Application.Properties.getValue("useMmol");
+            return setting instanceof Lang.Boolean ? setting : true;
+        }
+
         // Staleness threshold in seconds, from settings when the user has set one.
         static function staleThresholdSeconds() {
             var configured = Application.Properties.getValue("staleMinutes");

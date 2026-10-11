@@ -1,6 +1,6 @@
 {
-  "version": "2026.10.11-rc1",
-  "tag": "garmin-2026.10.11-rc1",
+  "version": "2026.10.11-rc2",
+  "tag": "garmin-2026.10.11-rc2",
   "sdk": "9.2.0",
   "status": "release-candidate",
   "devices": {

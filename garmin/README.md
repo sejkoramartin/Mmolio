@@ -31,6 +31,7 @@ Ověřená cesta: **xDrip4iOS → Garmin Connect / Connect IQ → Mmolio Bridge 
 |---|---|
 | `v` | verze, `1` |
 | `g` | celé mg/dL |
+| `u` | volitelná jednotka displeje: 0 = mg/dL, 1 = mmol/L |
 | `t` | trend `0–7`; `0` neznámý, `4` stabilní |
 | `m` | skutečný čas měření v Unix sekundách |
 | `s` | zdroj: `1` Medtrum, `2` LibreLinkUp, `3` xDrip |
@@ -118,7 +119,8 @@ takže samotný USB sideload nestačí. Nutná je verze xDrip4iOS s tímto odes�
   Barvy sledují motiv aktivity (`getBackgroundColor()`): černé pozadí s tyrkysovou, nebo
   bílé pozadí s tmavě tyrkysovou hodnotou. Když není místo, zmizí nejdřív jednotka, stáří
   nikdy.
-- **Nastavení jsou samostatná** (`useMmol`, výchozí mmol/L; `staleMinutes` 5–120, výchozí
+- **Jednotky přebírá z telefonu**, pokud přijatá zpráva obsahuje `u` (viz [protokol](wire-protocol.md)). Starší zprávy bez `u` používají místní `useMmol`.
+- **Místní nastavení jsou samostatná** (`useMmol`, výchozí mmol/L; `staleMinutes` 5–120, výchozí
   15), nezávislá na nastavení Bridge – každá Connect IQ aplikace má vlastní. Nastavují se
   v Garmin Connect / Connect IQ u aplikace Mmolio DataField.
 - Pole neřídí aktivitu, nevibruje a nezapisuje do FIT.

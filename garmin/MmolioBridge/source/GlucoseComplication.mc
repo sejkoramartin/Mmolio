@@ -59,8 +59,7 @@ module MedProbe {
         }
 
         static function usesMmol() {
-            var setting = Application.Properties.getValue("useMmol");
-            return setting == null ? true : setting;
+            return GlucoseStore.usesMmol();
         }
 
         static function displayValue(reading) {
