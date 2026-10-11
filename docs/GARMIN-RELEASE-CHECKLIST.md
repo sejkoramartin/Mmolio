@@ -1,6 +1,11 @@
 # Garmin release preparation
 
-This is the release gate for `2026.10.11-rc1`. It is not permission to publish.
+This is the release checklist for `2026.10.11-rc1`.
+
+On 2026-10-11 the owner authorized publishing the prepared release candidate and
+opening a draft upstream PR before Apple-platform and physical testing is complete.
+The pending tests below remain required before claiming a validated/stable release.
+The candidate is explicitly a prerelease; unchecked items are not reported as passed.
 
 ## Local build
 
