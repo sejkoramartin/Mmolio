@@ -4,3 +4,7 @@ project.manifest = manifest.xml
 
 base.sourcePath = source;../shared;../MmolioBridge/source/GlucoseReading.mc;../MmolioBridge/source/GlucoseStore.mc
 base.resourcePath = resources
+
+# Both Fenix variants share the 280px MIP resources.
+fenix7xpro.resourcePath = $(base.resourcePath);resources-fenix
+fenix7xpronowifi.resourcePath = $(base.resourcePath);resources-fenix

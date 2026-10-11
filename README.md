@@ -1,5 +1,7 @@
 # Mmolio
 
+**Instalace do hodinek:** [česky](docs/GARMIN-INSTALL-CS.md) · [English](docs/GARMIN-INSTALL.md).
+
 Glykemie z kontinuálního senzoru tam, kam se běžně nedostane: na hodinkách Garmin, na
 starém telefonu jako displeji na stole a v liště Ubuntu.
 
@@ -21,7 +23,7 @@ nepotřebuje vaše heslo k senzoru a nikam nic neodesílá.
 
 | Složka | Co to je |
 |---|---|
-| [`garmin/`](garmin/README.md) | Tři aplikace pro Forerunner 165: **Mmolio Bridge** přijímá měření z telefonu i na pozadí, **Mmolio WatchFace** je ciferník, **Mmolio DataField** datové pole do aktivit |
+| [`garmin/`](garmin/README.md) | Tři aplikace pro Forerunner 165 a fēnix 7X Pro (včetně varianty bez Wi-Fi): **Mmolio Bridge** přijímá měření z telefonu i na pozadí, **Mmolio WatchFace** je ciferník, **Mmolio DataField** datové pole do aktivit |
 | [`worker/`](worker/README.md) | Cloudflare Worker, který se tváří jako Nightscout, přijímá měření a servíruje displej i `/api/glucose` |
 | `gnome-extension/` | Rozšíření GNOME: hodnota v docku, barvy podle rozsahu a stáří, volitelné upozornění |
 | [`docs/`](docs/INSTALL.md) | Instalace, FAQ, právní upozornění |

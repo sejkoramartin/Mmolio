@@ -22,6 +22,8 @@
 
         <iq:products>
             <iq:product id="fr165"/>
+            <iq:product id="fenix7xpro"/>
+            <iq:product id="fenix7xpronowifi"/>
         </iq:products>
 
         <iq:permissions>

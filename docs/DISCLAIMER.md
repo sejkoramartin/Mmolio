@@ -36,8 +36,9 @@ neodpovídá za škody vzniklé jeho použitím. Podrobnosti jsou v [licenci](..
 
 ## Co se zveřejňuje
 
-Zveřejňuje se **zdrojový kód**, ne hotové instalační balíčky. Kdo chce Mmolio používat,
-sestaví si ho sám pro sebe a pro sebe si ho i provozuje. Nejde o uvedení výrobku na trh.
+Zdrojový kód zůstává veřejný pod GPL-3.0. Pro Garmin připravujeme také verzované
+instalační balíčky s návodem, licencí a uvedeným stavem ověření; jejich zveřejnění
+proběhne samostatně. Ostatní části projektu si uživatel sestavuje a provozuje sám.
 
 ## Ochranné známky
 

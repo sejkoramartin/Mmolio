@@ -15,3 +15,7 @@ base.resourcePath = resources
 fr165.resourcePath = $(base.resourcePath);resources-fr165
 
 # fr255.resourcePath = $(base.resourcePath);resources-fr255
+
+# Both Fenix variants share the 280px MIP resources.
+fenix7xpro.resourcePath = $(base.resourcePath);resources-fenix
+fenix7xpronowifi.resourcePath = $(base.resourcePath);resources-fenix

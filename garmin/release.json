@@ -1,0 +1,13 @@
+{
+  "version": "2026.10.11-rc1",
+  "tag": "garmin-2026.10.11-rc1",
+  "sdk": "9.2.0",
+  "status": "release-candidate",
+  "devices": {
+    "fr165": "Forerunner 165",
+    "fenix7xpro": "fenix 7X Pro",
+    "fenix7xpronowifi": "fenix 7X Pro – Solar Edition (no Wi-Fi)"
+  },
+  "physicalValidation": "pending-for-this-candidate",
+  "phoneIntegrationValidation": "clean-upstream-xDrip-build-and-hardware-testing-pending"
+}

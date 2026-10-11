@@ -1,13 +1,18 @@
 # Mmolio pro Garmin Forerunner 165
 
+**Instalace do hodinek:** [česky](../docs/GARMIN-INSTALL-CS.md) · [English](../docs/GARMIN-INSTALL.md).
+
+Podpora Fēnix 7X Pro (`fenix7xpro` i `fenix7xpronowifi`):
+[sestavení, výběr v xDripu a instalace](../docs/FENIX.md).
+
 - **Mmolio Bridge** – receiver watch-app, příjem z telefonu i na pozadí.
 - **Mmolio WatchFace** – AMOLED ciferník: datum, baterie, čas, glykemie, trend,
   stáří měření, aktuální tep a dnešní kroky.
 - **Mmolio DataField** – datové pole pro sportovní aktivity: glykemie, trend, jednotka a
   skutečné stáří měření. Data přijímá přímo z telefonu pod vlastním ID (viz níže).
 
-Historické složky `MedProbeWatch`, `xDripWatchFace` a interní namespace zůstávají kvůli
-kontinuitě. V menu hodinek jsou nové názvy; na ciferníku ani obrazovce Bridge není
+Historické interní namespace zůstávají kvůli kontinuitě; projekty nyní sídlí
+v MmolioBridge a MmolioWatchFace. V menu hodinek jsou nové názvy; na ciferníku ani obrazovce Bridge není
 nápis MedProbe nebo xDrip. Nový projekt `garmin/MmolioDataField` už nese nový název.
 iOS část MedProbe se touto úpravou nemění.
 
@@ -15,8 +20,8 @@ iOS část MedProbe se touto úpravou nemění.
 
 | Komponenta | application ID | Projekt |
 |---|---|---|
-| Mmolio Bridge | `a1b2c3d4e5f647589a0b1c2d3e4f5061` | `garmin/MedProbeWatch` |
-| Mmolio WatchFace | `b1c2d3e4f5a647589a0b1c2d3e4f5072` | `garmin/xDripWatchFace` |
+| Mmolio Bridge | `a1b2c3d4e5f647589a0b1c2d3e4f5061` | `garmin/MmolioBridge` |
+| Mmolio WatchFace | `b1c2d3e4f5a647589a0b1c2d3e4f5072` | `garmin/MmolioWatchFace` |
 | Mmolio DataField | `7ca56fd800634cab90f28d5e72be2e05` | `garmin/MmolioDataField` |
 
 Ověřená cesta: **xDrip4iOS → Garmin Connect / Connect IQ → Mmolio Bridge → complication
@@ -128,7 +133,8 @@ Garmin po instalaci také přiřazení pole k aktivitám.
 Předpoklady: Java, **Connect IQ SDK 9.2.0**, definice zařízení **fr165** v SDK Manageru
 a vývojářský `.der` klíč. Všechny tři aplikace musí být podepsané **stejným** klíčem,
 jinak ciferník ani pole neuvidí privátní complication Bridge. Klíč do repozitáře nepatří.
-FR255 resources zůstávají připravené, ale tento build cílí pouze na FR165.
+FR255 resources zůstávají připravené. Skript `build-fr165.sh` cílí na FR165;
+pro Fēnix použijte `build-device.sh` podle návodu výše.
 
 Z kořene repozitáře na Linuxu (na tomto PC jsou tyto cesty již dostupné):
 
@@ -153,9 +159,9 @@ Na Windows lze použít stejné projekty přímo s `monkeyc.bat` (cesty přizpů
 $Sdk = 'C:\path\to\connectiq-sdk-9.2.0'
 $Key = 'C:\path\to\existing\developer_key.der'
 New-Item -ItemType Directory -Force build/fr165/release
-& "$Sdk\bin\monkeyc.bat" -f garmin/MedProbeWatch/monkey.jungle -d fr165 -o build/fr165/release/MmolioBridge.prg -y $Key -l 2 -r
+& "$Sdk\bin\monkeyc.bat" -f garmin/MmolioBridge/monkey.jungle -d fr165 -o build/fr165/release/MmolioBridge.prg -y $Key -l 2 -r
 if ($LASTEXITCODE -ne 0) { throw 'Bridge build failed' }
-& "$Sdk\bin\monkeyc.bat" -f garmin/xDripWatchFace/monkey.jungle -d fr165 -o build/fr165/release/MmolioWatchFace.prg -y $Key -l 2 -r
+& "$Sdk\bin\monkeyc.bat" -f garmin/MmolioWatchFace/monkey.jungle -d fr165 -o build/fr165/release/MmolioWatchFace.prg -y $Key -l 2 -r
 if ($LASTEXITCODE -ne 0) { throw 'WatchFace build failed' }
 & "$Sdk\bin\monkeyc.bat" -f garmin/MmolioDataField/monkey.jungle -d fr165 -o build/fr165/release/MmolioDataField.prg -y $Key -l 2 -r
 if ($LASTEXITCODE -ne 0) { throw 'DataField build failed' }

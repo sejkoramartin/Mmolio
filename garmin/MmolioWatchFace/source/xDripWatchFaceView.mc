@@ -23,6 +23,8 @@ module xDripFace {
         static const TAIL_SEGMENT_DEGREES = 7;
 
         var mSleeping as Lang.Boolean = false;
+        var mBurnInProtection as Lang.Boolean = true;
+        var mScreenWidth as Lang.Number = 390;
         var mTimer as Timer.Timer? = null;
         var mTimeFont as Graphics.FontType = Graphics.FONT_XTINY;
         var mGlucoseFont as Graphics.FontType = Graphics.FONT_XTINY;
@@ -39,14 +41,20 @@ module xDripFace {
             return result == null ? fallback : result;
         }
 
+        function scaled(value as Lang.Number) as Lang.Number {
+            return value * mScreenWidth / 390;
+        }
+
         function onLayout(dc as Graphics.Dc) as Void {
-            mTimeFont = font(104, Graphics.FONT_NUMBER_HOT);
-            mGlucoseFont = font(76, Graphics.FONT_NUMBER_MEDIUM);
-            mSmallFont = font(23, Graphics.FONT_XTINY);
-            mMetricFont = font(32, Graphics.FONT_SMALL);
-            mLabelFont = font(18, Graphics.FONT_XTINY);
-            mSleepTimeFont = font(72, Graphics.FONT_NUMBER_MEDIUM);
-            mSleepGlucoseFont = font(48, Graphics.FONT_NUMBER_MILD);
+            mScreenWidth = dc.getWidth();
+            mBurnInProtection = System.getDeviceSettings().requiresBurnInProtection;
+            mTimeFont = font(scaled(104), Graphics.FONT_NUMBER_HOT);
+            mGlucoseFont = font(scaled(76), Graphics.FONT_NUMBER_MEDIUM);
+            mSmallFont = font(scaled(23), Graphics.FONT_XTINY);
+            mMetricFont = font(scaled(32), Graphics.FONT_SMALL);
+            mLabelFont = font(scaled(18), Graphics.FONT_XTINY);
+            mSleepTimeFont = font(scaled(72), Graphics.FONT_NUMBER_MEDIUM);
+            mSleepGlucoseFont = font(scaled(48), Graphics.FONT_NUMBER_MILD);
         }
 
         // Timers exist only in high power mode, so the running head is animated while
@@ -67,7 +75,7 @@ module xDripFace {
         }
 
         private function startAnimation() as Void {
-            if (mTimer != null || mSleeping) { return; }
+            if (!mBurnInProtection || mTimer != null || mSleeping) { return; }
             mTimer = new Timer.Timer();
             (mTimer as Timer.Timer).start(method(:onAnimationTick), 100, true);
         }
@@ -92,12 +100,13 @@ module xDripFace {
                 dateText, System.getSystemStats().battery.toNumber(), sample, heart, steps);
         }
 
-        // Fixed 390px FR165 composition. Keeping rendering separate also allows
+        // Scale the original FR165 composition to the device width. Keeping rendering separate also allows
         // simulator tests to exercise missing, stale and malformed data visually.
         function render(dc as Graphics.Dc, now as Lang.Number, timeText as Lang.String, dateText as Lang.String, battery as Lang.Number, sample as Mmolio.GlucoseSample?, heart as Lang.Number?, steps as Lang.Number?) as Void {
             dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_BLACK);
             dc.clear();
             var cx = dc.getWidth() / 2;
+            var dimmed = mSleeping && mBurnInProtection;
             var stale = sample != null && sample.isStale(now);
             var trusted = sample != null && !stale;
             var value = sample == null ? "--" : sample.valueText();
@@ -105,39 +114,39 @@ module xDripFace {
             var color = !trusted ? COLOR_UNTRUSTED
                 : (sample.inRange() ? COLOR_IN_RANGE : COLOR_OUT_OF_RANGE);
             drawRim(dc, now, color, trusted, trusted && !sample.inRange());
-            var timeFont = mSleeping ? mSleepTimeFont : mTimeFont;
-            var glucoseFont = mSleeping ? mSleepGlucoseFont : mGlucoseFont;
+            var timeFont = dimmed ? mSleepTimeFont : mTimeFont;
+            var glucoseFont = dimmed ? mSleepGlucoseFont : mGlucoseFont;
             // Small minute-based movement and reduced content in AMOLED sleep.
-            var shift = mSleeping ? ((now / 60) % 3 - 1) * 4 : 0;
+            var shift = dimmed ? ((now / 60) % 3 - 1) * 4 : 0;
             cx += shift;
             // Secondary values stay readable in always-on, only dimmed and moving with
             // the rest: a few thousand lit pixels at this brightness are far below what
             // the AMOLED always-on budget allows.
-            var secondary = mSleeping ? 0x555555 : 0xAAAAAA;
-            text(dc, cx - 102, 49 + shift, mSmallFont, dateText, secondary, Graphics.TEXT_JUSTIFY_LEFT);
-            text(dc, cx + 102, 49 + shift, mSmallFont, battery.format("%d") + "%", secondary,
+            var secondary = dimmed ? 0x555555 : 0xAAAAAA;
+            text(dc, cx - scaled(102), scaled(49) + shift, mSmallFont, dateText, secondary, Graphics.TEXT_JUSTIFY_LEFT);
+            text(dc, cx + scaled(102), scaled(49) + shift, mSmallFont, battery.format("%d") + "%", secondary,
                 Graphics.TEXT_JUSTIFY_RIGHT);
-            text(dc, cx, 123 + shift, timeFont, timeText,
-                mSleeping ? 0x777777 : Graphics.COLOR_WHITE, Graphics.TEXT_JUSTIFY_CENTER);
+            text(dc, cx, scaled(123) + shift, timeFont, timeText,
+                dimmed ? 0x777777 : Graphics.COLOR_WHITE, Graphics.TEXT_JUSTIFY_CENTER);
 
             var arrow = sample != null && !stale;
             var width = dc.getTextWidthInPixels(value, glucoseFont);
-            var totalWidth = width + (arrow ? 56 : 0);
+            var totalWidth = width + (arrow ? scaled(56) : 0);
             var left = cx - totalWidth / 2;
-            var valueColor = mSleeping ? dim(color, 45) : color;
-            text(dc, left, 215 + shift, glucoseFont, value,
+            var valueColor = dimmed ? dim(color, 45) : color;
+            text(dc, left, scaled(215) + shift, glucoseFont, value,
                 valueColor, Graphics.TEXT_JUSTIFY_LEFT);
             if (arrow) {
                 dc.setColor(valueColor, Graphics.COLOR_BLACK);
-                drawTrend(dc, left + width + 29, 215 + shift, sample.trend);
+                drawTrend(dc, left + width + scaled(29), scaled(215) + shift, sample.trend);
             }
             var status = sample == null ? "NO DATA" : sample.ageText(now);
             var unit = sample == null ? "" : sample.unitText() + "  ";
-            text(dc, cx, 267 + shift, mSmallFont, unit + status,
+            text(dc, cx, scaled(267) + shift, mSmallFont, unit + status,
                 stale ? 0xBBBBBB : 0x888888, Graphics.TEXT_JUSTIFY_CENTER);
             // The native current-HR complication returns null when unavailable.
-            metric(dc, cx - 80, shift, heart == null || heart == 0 ? "--" : heart.format("%d"), "BPM");
-            metric(dc, cx + 80, shift, steps == null ? "--" : steps.format("%d"), "STEPS");
+            metric(dc, cx - scaled(80), shift, heart == null || heart == 0 ? "--" : heart.format("%d"), "BPM");
+            metric(dc, cx + scaled(80), shift, steps == null ? "--" : steps.format("%d"), "STEPS");
         }
 
         // Awake: the whole rim glows in the range colour with a brighter head running
@@ -149,10 +158,18 @@ module xDripFace {
 
             var centerX = dc.getWidth() / 2;
             var centerY = dc.getHeight() / 2;
-            var radius = centerX - (RIM_WIDTH + 1) / 2;
+            var rimWidth = scaled(RIM_WIDTH);
+            var radius = centerX - (rimWidth + 1) / 2;
             var head;
 
-            dc.setPenWidth(RIM_WIDTH);
+            dc.setPenWidth(rimWidth);
+            // MIP remains fully legible in low power mode; no animation or fading.
+            if (!mBurnInProtection) {
+                dc.setColor(color, Graphics.COLOR_BLACK);
+                dc.drawCircle(centerX, centerY, radius);
+                dc.setPenWidth(1);
+                return;
+            }
             if (!mSleeping) {
                 dc.setColor(dim(color, 35), Graphics.COLOR_BLACK);
                 dc.drawCircle(centerX, centerY, radius);
@@ -188,10 +205,10 @@ module xDripFace {
 
         function metric(dc as Graphics.Dc, x as Lang.Number, shift as Lang.Number, value as Lang.String, label as Lang.String) as Void {
             // Fit even a six-digit daily step count in its half of the round face.
-            var metricFont = dc.getTextWidthInPixels(value, mMetricFont) > 130 ? mSmallFont : mMetricFont;
-            text(dc, x, 317 + shift, metricFont, value, mSleeping ? 0x666666 : 0xEEEEEE,
+            var metricFont = dc.getTextWidthInPixels(value, mMetricFont) > scaled(130) ? mSmallFont : mMetricFont;
+            text(dc, x, scaled(317) + shift, metricFont, value, (mSleeping && mBurnInProtection) ? 0x666666 : 0xEEEEEE,
                 Graphics.TEXT_JUSTIFY_CENTER);
-            text(dc, x, 345 + shift, mLabelFont, label, mSleeping ? 0x444444 : 0x888888,
+            text(dc, x, scaled(345) + shift, mLabelFont, label, (mSleeping && mBurnInProtection) ? 0x444444 : 0x888888,
                 Graphics.TEXT_JUSTIFY_CENTER);
         }
 
@@ -205,20 +222,20 @@ module xDripFace {
             var dy = trend <= 3 ? 1 : -1;
             if (trend == 3 || trend == 5) { dx = 1; }
             if (trend == 4) { dx = 1; dy = 0; }
-            dc.setPenWidth(4);
+            dc.setPenWidth(scaled(4));
             if (trend == 1 || trend == 7) {
-                arrowLine(dc, x - 8, y, dx, dy);
-                arrowLine(dc, x + 8, y, dx, dy);
+                arrowLine(dc, x - scaled(8), y, dx, dy);
+                arrowLine(dc, x + scaled(8), y, dx, dy);
             } else { arrowLine(dc, x, y, dx, dy); }
             dc.setPenWidth(1);
         }
 
         function arrowLine(dc as Graphics.Dc, x as Lang.Number, y as Lang.Number, dx as Lang.Number, dy as Lang.Number) as Void {
-            var tipX = x + dx * 15;
-            var tipY = y + dy * 15;
-            dc.drawLine(x - dx * 15, y - dy * 15, tipX, tipY);
-            dc.drawLine(tipX, tipY, tipX - dx * 10 - dy * 8, tipY - dy * 10 + dx * 8);
-            dc.drawLine(tipX, tipY, tipX - dx * 10 + dy * 8, tipY - dy * 10 - dx * 8);
+            var tipX = x + dx * scaled(15);
+            var tipY = y + dy * scaled(15);
+            dc.drawLine(x - dx * scaled(15), y - dy * scaled(15), tipX, tipY);
+            dc.drawLine(tipX, tipY, tipX - dx * scaled(10) - dy * scaled(8), tipY - dy * scaled(10) + dx * scaled(8));
+            dc.drawLine(tipX, tipY, tipX - dx * scaled(10) + dy * scaled(8), tipY - dy * scaled(10) - dx * scaled(8));
         }
     }
 }

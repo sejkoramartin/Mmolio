@@ -2,3 +2,7 @@ project.manifest = manifest.xml
 
 base.sourcePath = source;../shared
 base.resourcePath = resources
+
+# Both Fenix variants share the 280px MIP resources.
+fenix7xpro.resourcePath = $(base.resourcePath);resources-fenix
+fenix7xpronowifi.resourcePath = $(base.resourcePath);resources-fenix
