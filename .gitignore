@@ -1,7 +1,7 @@
 # Build output of the Garmin apps
 build/
 
-# Worker and GNOME extension
+# Worker
 node_modules/
 .wrangler/
 
@@ -28,6 +28,5 @@ private_keys/
 # macOS
 .DS_Store
 
-# Osobní nastavení – v repu je jen vzor (config.example.json, wrangler.toml)
-gnome-extension/glykemie@sejkora.local/config.json
+# Osobní nastavení – v repu je jen vzor wrangler.toml
 worker/wrangler.local.toml

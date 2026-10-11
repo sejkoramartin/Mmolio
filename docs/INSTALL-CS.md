@@ -11,8 +11,7 @@ zdravotnický prostředek a nenahrazuje oficiální aplikaci vašeho senzoru ani
 Postavte si jen to, co chcete.
 
 ```
-senzor ──► xDrip4iOS ──┬──► Cloudflare Worker ──┬──► telefon nebo tablet jako displej
-                       │                        └──► rozšíření do GNOME
+senzor ──► xDrip4iOS ──┬──► Cloudflare Worker ─────► telefon nebo tablet jako displej
                        └──► Garmin hodinky (Bridge, ciferník, datové pole)
 ```
 
@@ -114,30 +113,7 @@ Meze pro barvu hodnoty jsou ve funkci `colorForValue()` v `worker/public/index.h
 
 ---
 
-## 3. Rozšíření do GNOME
-
-Ukazuje hodnotu v docku, barví ji podle rozsahu a stáří a umí upozornit při hypo a hyper.
-Testované na GNOME 50 (Wayland).
-
-```bash
-cd Mmolio/gnome-extension/glykemie@sejkora.local
-cp config.example.json config.json      # a doplňte adresu svého workeru
-cd -
-ln -sfn "$PWD/gnome-extension/glykemie@sejkora.local" \
-  ~/.local/share/gnome-shell/extensions/glykemie@sejkora.local
-gnome-extensions enable glykemie@sejkora.local
-```
-
-Pak se odhlaste a přihlaste. **Změny v `extension.js` se projeví až po odhlášení**,
-protože Wayland neumí rozšíření přenačíst za běhu. Naproti tomu `config.json` se načítá
-živě, takže pozici, velikosti, meze i upozornění doladíte bez odhlašování.
-
-V nabídce (klik na hodnotu) je přepínač **Alarm**, který upozornění vypne včetně toho,
-které zrovna zvoní.
-
----
-
-## 4. Hodinky Garmin
+## 3. Hodinky Garmin
 
 Tři aplikace pro Forerunner 165:
 

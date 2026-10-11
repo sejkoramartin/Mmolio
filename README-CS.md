@@ -5,7 +5,7 @@
 **Instalace do hodinek:** [česky](docs/GARMIN-INSTALL-CS.md) · [English](docs/GARMIN-INSTALL.md).
 
 Glykemie z kontinuálního senzoru tam, kam se běžně nedostane: na hodinkách Garmin, na
-starém telefonu jako displeji na stole a v liště Ubuntu.
+starém telefonu jako displeji na stole.
 
 > ⚠️ **Mmolio není zdravotnický prostředek.** Jen zobrazuje hodnoty, které naměřil váš
 > senzor. Nerozhodujte podle něj o léčbě a nechte si zapnuté alarmy v oficiální aplikaci
@@ -14,8 +14,7 @@ starém telefonu jako displeji na stole a v liště Ubuntu.
 ```
 Dexcom G7 ──BLE──► xDrip4iOS (iPhone) ──┬──► Connect IQ ──► Garmin FR165
                                         │                   Bridge + ciferník + datové pole
-                                        └──► HTTPS ──► Cloudflare Worker ──┬──► telefon jako displej
-                                                                           └──► rozšíření do GNOME
+                                        └──► HTTPS ──► Cloudflare Worker ──► telefon jako displej
 ```
 
 Mmolio si data nikde nebere samo, nechává si je posílat. Neptá se žádné cizí služby,
@@ -27,7 +26,6 @@ nepotřebuje vaše heslo k senzoru a nikam nic neodesílá.
 |---|---|
 | [`garmin/`](garmin/README-CS.md) | Tři aplikace pro Forerunner 165 a fēnix 7X Pro (včetně varianty bez Wi-Fi): **Mmolio Bridge** přijímá měření z telefonu i na pozadí, **Mmolio WatchFace** je ciferník, **Mmolio DataField** datové pole do aktivit |
 | [`worker/`](worker/README-CS.md) | Cloudflare Worker, který se tváří jako Nightscout, přijímá měření a servíruje displej i `/api/glucose` |
-| `gnome-extension/` | Rozšíření GNOME: hodnota v docku, barvy podle rozsahu a stáří, volitelné upozornění |
 | [`docs/`](docs/INSTALL-CS.md) | Instalace, FAQ, právní upozornění |
 
 Odesílatel do hodinek tady není. Je to fork xDrip4iOS
@@ -39,13 +37,13 @@ v [`garmin/wire-protocol.md`](garmin/wire-protocol.md).
 ## Instalace
 
 Postup krok za krokem je v [`docs/INSTALL.md`](docs/INSTALL-CS.md): Cloudflare Worker,
-displej na telefonu, rozšíření do GNOME a hodinky Garmin. Části jsou nezávislé, postavte
+displej na telefonu a hodinky Garmin. Části jsou nezávislé, postavte
 si jen to, co chcete. Když něco nefunguje, koukněte do [FAQ](docs/FAQ-CS.md).
 
 Pro Garmin jsou dostupné [testovací instalační balíčky](https://github.com/sejkoramartin/Mmolio/releases)
-s návody, licencí a upozorněním, bez zdrojových kódů, workeru a rozšíření GNOME.
+s návody, licencí a upozorněním, bez zdrojových kódů a workeru.
 Fyzické ověření aktuálního kandidáta na všech modelech stále čeká.
-Zdrojový kód je dostupný samostatně; volitelné webové a desktopové části si provozuje každý sám.
+Zdrojový kód je dostupný samostatně; volitelné webové části si provozuje každý sám.
 
 ## Pravidlo, které platí všude
 

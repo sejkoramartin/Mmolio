@@ -1,10 +1,9 @@
 # Worker a displeje – kontext
 
 > Součást repa Mmolio. Pravidla pro celý projekt jsou v kořenovém `CLAUDE.md`,
-> tenhle soubor je o workeru, displeji pro iPhone a GNOME rozšíření.
+> tenhle soubor je o workeru a displeji pro iPhone.
 
-Displej glykemie na starém iPhone XS (fullscreen, landscape) a v liště
-Ubuntu/GNOME, napájený z Cloudflare Workeru, do kterého **xDrip4iOS nahrává
+Displej glykemie na starém iPhone XS (fullscreen, landscape), napájený z Cloudflare Workeru, do kterého **xDrip4iOS nahrává
 naměřené hodnoty**. Do budoucna možná LED matice Ulanzi TC001 a vlastní
 ESP32 panel do dílny.
 
@@ -23,9 +22,8 @@ Cloudflare Worker "glykemie" (worker.js)
   - /api/glucose → vrací poslední hodnotu jako jednoduché JSON
   - cokoliv jiného → static assets binding servíruje public/index.html
         │
-        ├─→ iPhone XS — Safari → "Přidat na plochu" → fullscreen PWA
+        └─→ iPhone XS — Safari → "Přidat na plochu" → fullscreen PWA
         │       (auto-zámek Nikdy + Řízený přístup, aby nezhasínalo)
-        └─→ GNOME rozšíření glykemie@sejkora.local (HUD v docku + alarmy)
 ```
 
 **Klíčové rozhodnutí: push místo dotazování.** Dřív se worker sám ptal
@@ -75,7 +73,7 @@ aby nebylo nutné měnit klienty. `trendAngle` je přesnější úhel včetně
    projektu (viz bod 4).
 3. **Tajemství musí mít aspoň 12 znaků** – Nightscout kratší neuznává.
 4. **Ticho na lince není totéž co "glykemie je v pořádku".** Když data
-   nechodí, musí to být vidět. Displej i rozšíření proto barví hodnotu
+   nechodí, musí to být vidět. Displej proto barví hodnotu
    podle stáří a `/api/glucose` vrací 503, dokud nedorazí první měření.
    V 8–9/2026 nám worker měsíc nefungoval a nikdo si nevšiml.
 5. **Bindingy musí být ve `wrangler.toml`, ne jen naklikané v dashboardu** –

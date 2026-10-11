@@ -19,7 +19,6 @@ na push z xDrip4iOS. Od téhož dne je projekt součástí repa `sejkoramartin/M
 | KV klíč s daty | `ns_latest` – poslední měření |
 | Secrets Store | id `<ID-VASEHO-SECRETS-STORE>` |
 | Jediný secret | `NIGHTSCOUT_API_SECRET` |
-| GNOME rozšíření | `~/.local/share/gnome-shell/extensions/glykemie@sejkora.local` → **symlink** do `gnome-extension/` v projektu |
 
 Zdroj dat je **xDrip4iOS na iPhonu**, který do workeru nahrává měření, jako by
 to byl Nightscout. Worker se nikam neptá. Souběžně uživateli běží **CamAPS FX**,
@@ -46,9 +45,6 @@ worker/wrangler.toml      konfigurace; POZOR: bindingy musí být tady, ne v das
 worker/public/index.html  displej pro iPhone (fullscreen PWA)
 worker/CLAUDE.md          architektura + trial-and-error poznatky
 worker/README.md          nasazení a obsluha
-gnome-extension/…/        rozšíření pro GNOME 50 – HUD v docku, alarmy
-  extension.js            logika (změna vyžaduje odhlášení, viz níž)
-  config.json             nastavení, načítá se ZA BĚHU
 docs/mmolio-navrh.md      návrh samostatné Windows aplikace (viz dluhy)
 docs/mmolio-pravni-texty.md  právní texty k té aplikaci
 garmin/                   aplikace pro hodinky Garmin
@@ -74,22 +70,6 @@ typicky problém na straně telefonu (xDrip nenahrává, špatné URL nebo API_S
 bindingům – běží to na Cloudflare, ale produkce se nedotkne. Teprve pak
 `npx wrangler deploy`. Pro ladění je v pohodě dočasně přidat debug endpoint,
 jen ho nesmíš zapomenout odstranit před nasazením.
-
-**GNOME rozšíření.** Tohle je důležité: na Waylandu **nejde přenačíst kód
-rozšíření za běhu**. Zkoušeli jsme `ReloadExtension` (v GNOME 50 deprecated
-a odmítne to), cyklus disable/enable (načte starý kód z cache) i vnořenou
-instanci Shellu (nefunguje). Jediná cesta je **odhlášení a přihlášení uživatele**.
-
-Proto:
-- změny v `extension.js` dávkuj a před odhlášením ověř syntax
-  (`node --check` na kopii s příponou `.mjs`)
-- co jde, dělej přes `config.json` – ten se načítá živě a uživatel tím může
-  ladit pozici, velikosti i prahy bez odhlašování
-- chyby po přihlášení najdeš rychleji takhle než v journalu:
-  ```bash
-  gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell \
-    --method org.gnome.Shell.Extensions.GetExtensionErrors "glykemie@sejkora.local"
-  ```
 
 ## 6. Pravidla, která v tomhle projektu platí
 
@@ -123,7 +103,7 @@ proti pydexcom. Když jsem psal z paměti, spletl jsem se (`.NET 8` místo 10,
 
 ## 8. Známé dluhy a nedodělky
 
-~~**Projekt není git repozitář.**~~ Vyřešeno 28. 9. 2026: worker i rozšíření jsou
+~~**Projekt není git repozitář.**~~ Vyřešeno 28. 9. 2026: worker je
 součástí repa `sejkoramartin/Mmolio`, `node_modules` a `.wrangler` jsou v `.gitignore`.
 
 **`mmolio-navrh.md` v projektu je zastaralý.** Uživatel si nechal návrh

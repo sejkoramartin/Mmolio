@@ -49,23 +49,15 @@ No usable reading returns HTTP 503. Uploads follow source measurements rather th
 being polled by the worker. Data age must remain visible. The read endpoint is
 public to anyone who knows its URL; see the [disclaimer](../docs/DISCLAIMER.md).
 
-## Web and GNOME displays
+## Web display
 
 Open the worker URL in Safari and use **Share → Add to Home Screen** for a dedicated
 phone display. Auto-Lock and Guided Access can be configured in iOS. Avoid a bright
 static display on OLED devices; the existing interface uses a dark design.
 
-The GNOME extension lives in `gnome-extension/glykemie@sejkora.local` in the
-repository root. See the [installation guide](../docs/INSTALL.md) for the symlink
-and enable steps. It displays glucose in the dock with a menu and supplemental
-notifications. Its **Alarm** switch persists `alertEnabled` in `config.json` and
-stops the active overlay/sound; colours and panel notifications remain separate.
-A manual alarm-test action remains available while automatic sound is disabled.
-
-`config.json` is read at runtime. Changes to `extension.js` require logout/login
-on Wayland. The existing web/desktop colour thresholds are 4.2–9.5 mmol/L; edit
-`colorForValue()` in `public/index.html` or the extension's own configuration.
-These optional displays do not inherit the Garmin unit preference.
+The web display uses range colours configured in `colorForValue()` in
+`public/index.html` (existing limits: 4.2–9.5 mmol/L). It does not inherit the
+Garmin unit preference.
 
 [Historical maintainer context (Czech)](CLAUDE.md) and
 [handover notes (Czech)](HANDOVER.md) are retained separately from this user guide.

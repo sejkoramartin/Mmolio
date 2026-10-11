@@ -1,7 +1,7 @@
 # Mmolio – kontext pro práci na projektu
 
 Struktura a odkazy jsou v `README.md`. Tenhle soubor je o tom, jak se v projektu pracuje.
-Pro worker a GNOME rozšíření platí navíc `worker/CLAUDE.md`, pro hodinky `garmin/README.md`.
+Pro worker platí navíc `worker/CLAUDE.md`, pro hodinky `garmin/README.md`.
 
 ## Co kde běží
 
@@ -11,7 +11,6 @@ Pro worker a GNOME rozšíření platí navíc `worker/CLAUDE.md`, pro hodinky `
 - **Telefon**: xDrip4iOS z forku `sejkoramartin/xdripswift`, větev `feature/garmin-watch`.
   Do tohoto repa nepatří a upravuje se jen tam.
 - **Cloudflare**: Worker `glykemie`, KV `TOKEN_KV`, Secrets Store s `NIGHTSCOUT_API_SECRET`.
-- **Ubuntu**: rozšíření `glykemie@sejkora.local` je symlink do `gnome-extension/`.
 
 ## Pravidla
 
@@ -26,8 +25,6 @@ Pro worker a GNOME rozšíření platí navíc `worker/CLAUDE.md`, pro hodinky `
 4. **Bindingy Cloudflare patří do konfiguráku**, ne do dashboardu; `deploy` smaže
    všechno, co v něm nenajde. V repu je vzor `worker/wrangler.toml` s placeholdery,
    skutečná ID jsou v `worker/wrangler.local.toml` mimo git: `deploy -c wrangler.local.toml`.
-   Stejně tak `gnome-extension/.../config.json` je osobní a mimo git, v repu je
-   `config.example.json`.
 5. **Změny se ověřují lokálně, ne v CI.** GitHub Actions se šetří.
 6. **Repo je veřejné pod GPL-3.0.** Do repa nepatří adresa workeru, ID účtu ani nic
    osobního – všude jen příklady. Veřejná dokumentace je primárně anglicky; české verze mají příponu `-CS.md` a obousměrné odkazy. Historické podklady a komunikace mohou zůstat česky.
@@ -51,9 +48,6 @@ na rozbalené závislosti. Po změně ověř, že se `.prg` nezměnilo tam, kde 
 
 **Worker.** Nejdřív `npx wrangler dev --remote` proti živým bindingům, teprve pak
 `npx wrangler deploy`. Podrobně v `worker/README.md`.
-
-**GNOME rozšíření.** `config.json` se načítá za běhu, `extension.js` vyžaduje odhlášení
-a přihlášení uživatele – Wayland neumí rozšíření přenačíst.
 
 ## Otevřené úkoly
 

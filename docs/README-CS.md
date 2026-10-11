@@ -3,7 +3,7 @@
 [English](README.md) · **Čeština**
 
 - [Instalace do Garminu](GARMIN-INSTALL-CS.md)
-- [Volitelné webové a desktopové části](INSTALL-CS.md)
+- [Volitelné webové části](INSTALL-CS.md)
 - [Časté otázky](FAQ-CS.md)
 - [Upozornění](DISCLAIMER-CS.md)
 - [Technický návod Garmin](../garmin/README-CS.md)

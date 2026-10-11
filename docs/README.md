@@ -5,7 +5,7 @@
 ## Start here
 
 - [Garmin installation and downloads](GARMIN-INSTALL.md) · [Čeština](GARMIN-INSTALL-CS.md)
-- [Optional web/desktop installation](INSTALL.md) · [Čeština](INSTALL-CS.md)
+- [Optional web installation](INSTALL.md) · [Čeština](INSTALL-CS.md)
 - [FAQ and troubleshooting](FAQ.md) · [Čeština](FAQ-CS.md)
 - [Full disclaimer](DISCLAIMER.md) · [Čeština](DISCLAIMER-CS.md)
 - [Garmin watch disclaimer](DISCLAIMER-EN.md)

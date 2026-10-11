@@ -2,7 +2,7 @@
 //
 // Worker se tváří jako Nightscout server. xDrip4iOS do něj nahrává naměřené
 // hodnoty (push), worker si poslední z nich drží v KV a servíruje ji displeji
-// na iPhonu i rozšíření pro GNOME přes /api/glucose.
+// na iPhonu přes /api/glucose.
 //
 // Proč takhle: odpadá dotazování neveřejných API výrobců (Abbott, Dexcom),
 // se kterými jsme se za měsíc třikrát položili, a odpadá i provozování
@@ -21,7 +21,7 @@ const KEY_LATEST = "ns_latest";
 
 // Nightscout "direction" -> co vydáváme klientům.
 //  - trendArrow drží starou pětistupňovou škálu (1..5) kvůli zpětné
-//    kompatibilitě s displejem na iPhonu a s rozšířením pro GNOME
+//    kompatibilitě s displejem na iPhonu
 //  - trendAngle je přesnější úhel pro budoucí klienty (0 = doprava)
 const TRENDS = {
 	DoubleUp: { arrow: 5, symbol: "↑↑", angle: -90 },
@@ -233,7 +233,7 @@ export default {
 			return new Response(null, { headers: corsHeaders() });
 		}
 
-		// Displej a rozšíření – beze změny kontraktu.
+		// Displej – beze změny kontraktu.
 		if (path === "/api/glucose") {
 			try {
 				return await handleGlucose(env);

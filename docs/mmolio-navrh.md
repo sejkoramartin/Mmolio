@@ -4,8 +4,7 @@ Souhrn všech rozhodnutí z návrhové fáze (13. 9. 2026). Tenhle dokument je
 **aktuální autorita** – artifact „Glykemie pro Windows“ je původní návrh a část
 jeho doporučení už je tímhle přepsaná (viz *Změny oproti návrhu* na konci).
 
-Navazuje na projekt `glupro` (viz `CLAUDE.md`) – displej glykemie na iPhonu
-a rozšíření pro GNOME. Právní texty jsou v `mmolio-pravni-texty.md`.
+Navazuje na projekt `glupro` (viz `CLAUDE.md`) – displej glykemie na iPhonu. Právní texty jsou v `mmolio-pravni-texty.md`.
 
 ---
 
@@ -41,7 +40,7 @@ pověření Windows. Žádný server, žádná registrace, žádná cizí data u
 - **Nightscout** – URL + API token
 
 Cloudflare Worker `glykemie` se do Mmolia **netahá**. Zůstává výhradně pro
-Martinova ostatní zařízení (iPhone PWA, GNOME rozšíření, plánovaný ESP32 panel).
+Martinova ostatní zařízení (iPhone PWA, plánovaný ESP32 panel).
 
 ### Proč ne sdílený server
 
@@ -77,7 +76,7 @@ stupňů a mapuje se do ní bez šikmých šipek – opačně by se informace zt
 
 ## 3. Zobrazení
 
-Windows nemá obdobu panelu GNOME – lišta je pro třetí strany uzavřená
+Lišta Windows je pro třetí strany uzavřená
 a deskbandy Microsoft ve Win11 odstranil. Náhrada je dvojí:
 
 **Tray ikona** – běží vždy, nejde vypnout. Číslo se vykresluje do bitmapy

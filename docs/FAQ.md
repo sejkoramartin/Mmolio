@@ -23,7 +23,7 @@ own build and validation; do not infer compatibility from similar names.
 ### Where do my readings go?
 
 For Garmin, from your phone to the selected watch via Garmin's SDK. The optional
-web/desktop route uses your own Cloudflare worker. Its read endpoint is public to
+web route uses your own Cloudflare worker. Its read endpoint is public to
 anyone who knows the URL; do not publish that URL with your glucose data.
 
 ## Garmin
@@ -81,7 +81,7 @@ formatting, not those threshold settings. Colours are implemented in
 Use Connect IQ SDK 9.2.0 and install the exact target's device definitions in SDK
 Manager. Device definitions are downloaded separately from the SDK archive.
 
-## Optional worker and desktop components
+## Optional worker and web display
 
 ### /api/glucose returns 503
 
@@ -103,20 +103,6 @@ configuration must include them rather than relying only on dashboard settings.
 The worker's historical troubleshooting notes identify an outdated
 `compatibility_date` as a cause. Preserve the repository's configured date and
 Secrets Store binding type when reproducing that setup.
-
-### My GNOME code changes do not appear
-
-After changing `extension.js`, log out and in on Wayland. `config.json` changes
-are read at runtime. Inspect extension errors with:
-
-```bash
-gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell   --method org.gnome.Shell.Extensions.GetExtensionErrors "glykemie@sejkora.local"
-```
-
-### How do I silence the desktop alarm?
-
-Use the extension's **Alarm** switch. It stops the current overlay/sound and
-persists the choice; the value display and panel notifications remain separate.
 
 ## Development
 

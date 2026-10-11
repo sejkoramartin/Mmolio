@@ -1,8 +1,0 @@
-{
-  "uuid": "glykemie@sejkora.local",
-  "name": "Glykemie",
-  "description": "Ukazuje aktuální glykemii z LibreLinkUp v horní liště a upozorní při hypo/hyper.",
-  "version": 1,
-  "shell-version": ["50"],
-  "url": "https://github.com/sejkoramartin/Mmolio"
-}

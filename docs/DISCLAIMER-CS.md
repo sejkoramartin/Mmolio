@@ -14,12 +14,10 @@ svého senzoru a podle glukometru**, nikdy podle Mmolia.
 
 ## Alarmy si nechte v oficiální aplikaci
 
-Alarmy oficiální aplikace senzoru jsou vaše hlavní pojistka a mají zůstat zapnuté.
-Upozornění v Mmoliu jsou pouze doplňková. Mohou se opozdit nebo nezaznít vůbec, například
-když vypadne internet, vybije se telefon, počítač usne nebo hodinky ztratí spojení.
+Alarmy oficiální aplikace senzoru mají zůstat zapnuté. Mmolio je doplňkový displej
+a tyto alarmy nenahrazuje.
 
 Watch-app, ciferník ani datové pole na hodinkách žádné alarmy nemají a mít nebudou.
-Upozornění umí jen rozšíření do GNOME a jde vypnout.
 
 ## Hodnota může být stará, chybná, nebo nemusí dorazit
 

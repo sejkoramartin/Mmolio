@@ -13,15 +13,13 @@ Mmolio. Use your usual official sensor application and glucose meter.
 
 ## Keep your usual alarms enabled
 
-Keep the official sensor application's alarms enabled. Mmolio notifications are
-supplemental and may be delayed or missing if connectivity is lost, a device runs
-out of power or a computer sleeps. The Garmin watch app, watch face and data field
-do not provide glucose alarms. Only the optional GNOME extension provides
-supplemental notifications, which can be disabled.
+Keep the official sensor application's alarms enabled. Mmolio is a supplemental
+display and does not replace those alarms. The Garmin watch app, watch face and
+data field do not provide glucose alarms.
 
 ## Readings can be old, incorrect or missing
 
-Data passes through multiple devices and, for the optional web/desktop route,
+Data passes through multiple devices and, for the optional web route,
 the internet. It may be delayed or lost. Measurement age must be calculated from
 the original measurement time, not receipt time. The watch marks old readings
 `STALE` and future measurement times `CHECK TIME`. A missing or grey display means
@@ -50,7 +48,7 @@ endorsed or approved by those companies.
 ## Your data
 
 The Garmin route sends readings from the phone to the selected watch through
-Garmin's SDK and does not require a Mmolio server. The optional web/desktop route
+Garmin's SDK and does not require a Mmolio server. The optional web route
 sends readings to your own worker on your Cloudflare account.
 
 **The optional worker's read endpoint is public.** Anyone who knows its address

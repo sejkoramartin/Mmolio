@@ -47,26 +47,7 @@ Staré `compatibility_date`. Se starým datem runtime vyrobí z bindingu obecný
 Musí být aspoň `2026-05-01`.
 
 ### Chci měnit meze pro barvy
-Ve `worker/public/index.html` ve funkci `colorForValue()`, u rozšíření v `config.json`
-a na hodinkách v nastavení Bridge a DataFieldu.
-
----
-
-## Rozšíření do GNOME
-
-### Změnil jsem `extension.js` a nic se nestalo
-Wayland neumí rozšíření přenačíst za běhu. Musíte se odhlásit a přihlásit. Naopak
-`config.json` se čte živě, takže se v něm dá ladit bez odhlašování.
-
-### Jak zjistím, proč rozšíření nefunguje
-```bash
-gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell \
-  --method org.gnome.Shell.Extensions.GetExtensionErrors "glykemie@sejkora.local"
-```
-
-### Alarm mě ruší
-V nabídce rozšíření je přepínač **Alarm**. Vypne i ten, který zrovna zvoní, a volba
-vydrží i po odhlášení. Hodnota se dál barví a upozornění v liště chodí dál.
+Ve `worker/public/index.html` ve funkci `colorForValue()` a na hodinkách v nastavení Bridge a DataFieldu.
 
 ---
 

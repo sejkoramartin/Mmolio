@@ -19,5 +19,5 @@ descriptively. Mmolio is not developed, endorsed or approved by those companies.
 
 This watch installation does not require the optional Mmolio Cloudflare worker.
 The Garmin sender transmits readings to the selected watch through Garmin's SDK.
-The optional web/desktop components have separate data and network considerations;
+The optional web components have separate data and network considerations;
 see the project's [full disclaimer](DISCLAIMER.md).

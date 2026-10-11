@@ -4,12 +4,12 @@
 
 Read the [disclaimer](DISCLAIMER.md) first. Components are independent: install
 only the ones you need. **For Garmin, start with the [watch installation guide](GARMIN-INSTALL.md).**
-It covers ready-made ZIPs for each supported target; no Cloudflare account, worker,
-GNOME extension or local compilation is needed for the Garmin route.
+It covers ready-made ZIPs for each supported target; no Cloudflare account, worker
+or local compilation is needed for the Garmin route.
 
 ```text
 sensor → xDrip4iOS → Garmin Bridge / WatchFace / DataField
-                  └→ optional Cloudflare Worker → web display / GNOME extension
+                  └→ optional Cloudflare Worker → web display
 ```
 
 ## Optional Cloudflare worker
@@ -62,27 +62,6 @@ HTTP 503 means no usable reading is available; check uploads and data age.
 
 Display colour thresholds are in `colorForValue()` in `worker/public/index.html`.
 This optional display is separate from the Garmin unit setting.
-
-## Optional GNOME extension
-
-The extension shows glucose in the dock, colours it by range and age, and has
-supplemental notifications. The project's recorded desktop environment is GNOME 50
-on Wayland; this documentation update does not claim new platform validation.
-
-From the repository root:
-
-```bash
-cd gnome-extension/glykemie@sejkora.local
-cp config.example.json config.json
-# Edit config.json with your own worker URL.
-cd ../..
-ln -sfn "$PWD/gnome-extension/glykemie@sejkora.local"   ~/.local/share/gnome-shell/extensions/glykemie@sejkora.local
-gnome-extensions enable glykemie@sejkora.local
-```
-
-Log out and back in after changing `extension.js` on Wayland. `config.json` is read
-at runtime. The **Alarm** switch disables the overlay and sound, including a
-currently active alarm; display colours and panel notifications remain separate.
 
 ## Garmin development
 

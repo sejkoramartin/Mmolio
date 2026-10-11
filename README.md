@@ -2,15 +2,14 @@
 
 **English** · [Čeština](README-CS.md)
 
-Display CGM glucose readings on Garmin watches, a spare phone or tablet, and the
-Ubuntu desktop. Mmolio receives readings from a phone application; it does not
-measure glucose itself.
+Display CGM glucose readings on Garmin watches and a spare phone or tablet.
+Mmolio receives readings from a phone application; it does not measure glucose itself.
 
 **Garmin installation:** [English guide](docs/GARMIN-INSTALL.md) · [Český návod](docs/GARMIN-INSTALL-CS.md)
 
 **Downloads:** [Garmin release candidates](https://github.com/sejkoramartin/Mmolio/releases).
 Choose the ZIP for your exact watch model. Each installer includes the watch apps,
-instructions, license and disclaimers, without source files, the worker or GNOME extension.
+instructions, license and disclaimers, without source files or the worker.
 
 > **Mmolio is not a medical device.** It is a supplemental display, not a basis for
 > treatment decisions. Keep your usual sensor application's alarms enabled.
@@ -47,13 +46,12 @@ in upstream. See the PR for detailed evidence and remaining hardware tests.
 | --- | --- |
 | [garmin/](garmin/README.md) | Bridge receiver, WatchFace and optional activity DataField |
 | [worker/](worker/README.md) | Optional self-hosted Cloudflare receiver and web display |
-| [gnome-extension/](gnome-extension/) | Optional Ubuntu/GNOME glucose display and supplemental notifications |
 | [docs/](docs/README.md) | Installation guides, FAQ, disclaimers and development notes |
 
-The web/desktop route is separate from Garmin:
+The web route is separate from Garmin:
 
 ```text
-xDrip4iOS → HTTPS → your Cloudflare Worker → phone/tablet web display or GNOME extension
+xDrip4iOS → HTTPS → your Cloudflare Worker → phone/tablet web display
 ```
 
 Use only the components you need. The worker is configured with your own account
@@ -63,7 +61,7 @@ worker's read endpoint is public to anyone who knows its URL; see the disclaimer
 ## Installation and development
 
 - [Install Garmin apps from a release ZIP](docs/GARMIN-INSTALL.md)
-- [Set up optional web and desktop components](docs/INSTALL.md)
+- [Set up optional web components](docs/INSTALL.md)
 - [Troubleshooting / FAQ](docs/FAQ.md)
 - [Garmin build instructions](garmin/README.md) and [phone protocol](garmin/wire-protocol.md)
 
